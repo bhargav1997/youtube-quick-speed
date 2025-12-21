@@ -3,7 +3,6 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Speed Controller</title>
     <link rel="stylesheet" href="popup.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -11,6 +10,7 @@
 
 <body>
     <div class="container">
+        <!-- Header -->
         <header>
             <div class="title-group">
                 <div class="logo-icon">
@@ -24,6 +24,7 @@
             <div id="current-speed-display" class="speed-badge">1.0x</div>
         </header>
 
+        <!-- Speed Controls -->
         <div class="control-panel">
             <div class="grid-controls">
                 <button class="speed-btn" data-speed="1">1x</button>
@@ -33,7 +34,6 @@
                 <button class="speed-btn" data-speed="3">3x</button>
                 <button class="speed-btn" data-speed="4">4x</button>
             </div>
-
             <button id="reset-btn" class="reset-btn">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="margin-right: 6px;">
                     <path
@@ -43,27 +43,91 @@
             </button>
         </div>
 
-        <!-- New Ad Control Section -->
+        <!-- Volume Booster -->
+        <div class="control-panel no-pad-bottom">
+            <div class="panel-header">
+                <div class="icon-wrap">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path
+                            d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                    </svg>
+                </div>
+                <span>Volume Boost</span>
+                <span id="vol-value" class="value-tag">100%</span>
+            </div>
+            <div class="slider-container">
+                <input type="range" id="vol-slider" min="1" max="6" step="0.1" value="1">
+            </div>
+        </div>
+
+        <!-- Loop Control -->
+        <div class="control-panel">
+            <div class="panel-header">
+                <div class="icon-wrap">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path
+                            d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z" />
+                    </svg>
+                </div>
+                <span>A-B Loop</span>
+                <span id="loop-status" class="value-tag off">OFF</span>
+            </div>
+
+            <div class="loop-grid">
+                <button id="btn-loop-a" class="loop-btn">
+                    <span class="label">A (Start)</span>
+                    <span class="time" id="time-a">Set</span>
+                </button>
+                <button id="btn-loop-b" class="loop-btn">
+                    <span class="label">B (End)</span>
+                    <span class="time" id="time-b">Set</span>
+                </button>
+                <button id="btn-loop-clear" class="loop-btn clear-btn" disabled title="Clear Loop">
+                    ✕
+                </button>
+            </div>
+            <div class="how-it-works-small">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"
+                    style="min-width: 12px; margin-top: 2px;">
+                    <path
+                        d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                </svg>
+                <span>Pause at desired start & click <b>A</b>. Pause at end & click <b>B</b> to loop.</span>
+            </div>
+        </div>
+
+        <!-- Settings (Ads) -->
         <div class="settings-panel">
             <div class="setting-row">
                 <div class="setting-label">
-                    <span class="setting-icon">⏩</span>
-                    <span>Auto-skip skippable ads</span>
+                    <div class="icon-wrap">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path
+                                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z" />
+                        </svg>
+                    </div>
+                    <span>Auto-skip ads</span>
                 </div>
                 <label class="toggle-switch">
                     <input type="checkbox" id="auto-skip-toggle" checked>
                     <span class="slider"></span>
                 </label>
             </div>
-        </div>
-
-        <div class="info-section">
-            <h2>How it works</h2>
-            <p>Select speed to change playback. Ads skip automatically.</p>
-            <div class="tip-box">
-                <span class="icon">💡</span>
-                <span class="text">If it doesn't work, please <span class="highlight">reload the page</span> and try
-                    again.</span>
+            <!-- Second Toggle: Speed Up Ads -->
+            <div class="setting-row" style="margin-top: 8px;">
+                <div class="setting-label">
+                    <div class="icon-wrap">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path
+                                d="M19 19h-6v-1.15c1.43-.88 2.37-2.44 2.37-4.21 0-2.48-1.79-4.52-4.14-4.89l3.52 3.52c1.43 1.95 2.65 4.15 4.25 6.73zM5.33 4.06l14.61 14.62-1.27 1.27-2.47-2.47C14.71 18.52 13.41 19 12 19c-3.15 0-5.87-2.01-6.8-4.89C6.54 12.01 8 10.15 8 10.15l-3.94-3.94L5.33 4.06z" />
+                        </svg>
+                    </div>
+                    <span>Speed up ads (16x)</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="speed-ads-toggle" checked>
+                    <span class="slider"></span>
+                </label>
             </div>
         </div>
     </div>

@@ -1,57 +1,102 @@
 document.addEventListener("DOMContentLoaded", () => {
-   const speedButtons = document.querySelectorAll(".speed-btn");
-   const displayBadge = document.getElementById("current-speed-display");
-   const resetBtn = document.getElementById("reset-btn");
-   const autoSkipToggle = document.getElementById("auto-skip-toggle");
+   // Elements
+   const elements = {
+      speedButtons: document.querySelectorAll(".speed-btn"),
+      displayBadge: document.getElementById("current-speed-display"),
+      resetBtn: document.getElementById("reset-btn"),
+      autoSkipToggle: document.getElementById("auto-skip-toggle"),
+      speedAdsToggle: document.getElementById("speed-ads-toggle"), // NEW
+      volSlider: document.getElementById("vol-slider"),
+      volValue: document.getElementById("vol-value"),
+      loopA: document.getElementById("btn-loop-a"),
+      loopB: document.getElementById("btn-loop-b"),
+      loopClear: document.getElementById("btn-loop-clear"),
+      loopStatus: document.getElementById("loop-status"),
+      timeA: document.getElementById("time-a"),
+      timeB: document.getElementById("time-b"),
+   };
 
-   // Helper to query active tab
+   // Helper: Format seconds to MM:SS
+   const formatTime = (seconds) => {
+      if (seconds === null || seconds === undefined) return "Set";
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return `${m}:${s.toString().padStart(2, "0")}`;
+   };
+
+   // Helper: Query active tab
    async function getActiveTab() {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       return tab;
    }
 
-   // Update UI based on state
-   function updateUI(speed, autoSkipEnabled) {
-      // Update speed text
-      if (speed) {
-         displayBadge.textContent = `${speed}x`;
-         // Update active button state
-         speedButtons.forEach((btn) => {
-            const btnSpeed = parseFloat(btn.dataset.speed);
-            if (btnSpeed === speed) {
-               btn.classList.add("active");
-            } else {
-               btn.classList.remove("active");
-            }
+   // Helper: Send Message safely
+   async function sendMessage(payload) {
+      const tab = await getActiveTab();
+      if (tab && tab.id && (tab.url.includes("youtube.com") || tab.url.includes("youtu.be"))) {
+         return new Promise((resolve) => {
+            chrome.tabs.sendMessage(tab.id, payload, resolve);
          });
-      }
-
-      // Update toggle state
-      if (autoSkipEnabled !== undefined) {
-         autoSkipToggle.checked = autoSkipEnabled;
       }
    }
 
-   // Initialize: Fetch state from content script
+   // Update UI
+   function updateUI(state) {
+      if (!state) return;
+
+      // Speed
+      if (state.speed) {
+         elements.displayBadge.textContent = `${state.speed}x`;
+         elements.speedButtons.forEach((btn) => {
+            const btnSpeed = parseFloat(btn.dataset.speed);
+            btn.classList.toggle("active", btnSpeed === state.speed);
+         });
+      }
+
+      // Toggles
+      if (state.autoSkip !== undefined) elements.autoSkipToggle.checked = state.autoSkip;
+      if (state.speedAds !== undefined) elements.speedAdsToggle.checked = state.speedAds;
+
+      // Volume
+      if (state.volume !== undefined) {
+         elements.volSlider.value = state.volume;
+         elements.volValue.textContent = `${Math.round(state.volume * 100)}%`;
+         if (state.volume > 1.0) elements.volValue.style.color = "var(--primary-color)";
+         else elements.volValue.style.color = "";
+      }
+
+      // Loop
+      if (state.loop) {
+         elements.timeA.textContent = formatTime(state.loop.start);
+         elements.timeB.textContent = formatTime(state.loop.end);
+
+         elements.loopA.classList.toggle("active", state.loop.start !== null);
+         elements.loopB.classList.toggle("active", state.loop.end !== null);
+
+         elements.loopStatus.textContent = state.loop.active ? "ON" : "OFF";
+         elements.loopStatus.className = `value-tag ${state.loop.active ? "on" : "off"}`;
+
+         elements.loopClear.disabled = state.loop.start === null && state.loop.end === null;
+      }
+   }
+
+   // Initialize
    (async () => {
       try {
          const tab = await getActiveTab();
          if (tab.url && (tab.url.includes("youtube.com") || tab.url.includes("youtu.be"))) {
             chrome.tabs.sendMessage(tab.id, { action: "GET_STATE" }, (response) => {
-               displayBadge.classList.remove("clickable", "error");
+               elements.displayBadge.classList.remove("clickable", "error");
                if (chrome.runtime.lastError) {
-                  // Missing Content script
-                  displayBadge.textContent = "Reload";
-                  displayBadge.classList.add("error");
-               } else if (response) {
-                  displayBadge.style = "";
-                  updateUI(response.speed, response.autoSkip);
+                  elements.displayBadge.textContent = "Reload";
+                  elements.displayBadge.classList.add("error");
+               } else {
+                  elements.displayBadge.style = "";
+                  updateUI(response);
                }
             });
          } else {
-            // Not on YouTube -> Show Open YouTube Icon Button
-            // Using innerHTML to inject SVG icons
-            displayBadge.innerHTML = `
+            elements.displayBadge.innerHTML = `
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                         <path d="M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.09L22 12c0 2.19-.16 3.8-.34 4.83-.18 1.03-.5 1.79-.96 2.28-.46.49-1.2.73-2.2.73L12 20c-3.15 0-5.09-.12-5.96-.34-.73-.23-1.4-.49-1.99-1.03-.49-.49-.81-1.25-.96-2.28L2.74 12c-.08-.76-.14-1.63-.14-2.6 0-3.35.4-5.32 1.3-6.23.49-.46 1.25-.79 2.28-.98 1.05-.22 3.03-.33 5.96-.33 3.65 0 5.86.17 6.64.4.92.27 1.63.53 2.12 1.02.49.49.81 1.25.96 2.29z"/>
                     </svg>
@@ -61,60 +106,60 @@ document.addEventListener("DOMContentLoaded", () => {
                         <line x1="10" y1="14" x2="21" y2="3"></line>
                     </svg>
                 `;
-            displayBadge.classList.add("clickable");
-            displayBadge.style = "";
+            elements.displayBadge.classList.add("clickable");
+            elements.displayBadge.style = "";
          }
       } catch (e) {
-         console.error("Error initializing popup:", e);
+         console.error(e);
       }
    })();
 
-   // Handle button clicks (Speed)
-   speedButtons.forEach((btn) => {
+   // --- EVENT LISTENERS ---
+
+   elements.speedButtons.forEach((btn) => {
       btn.addEventListener("click", async () => {
          const speed = parseFloat(btn.dataset.speed);
-         const tab = await getActiveTab();
-
-         if (tab && tab.id) {
-            // Optimistic UI update for speed
-            updateUI(speed, undefined);
-
-            chrome.tabs.sendMessage(tab.id, {
-               action: "SET_SPEED",
-               speed: speed,
-            });
-         }
+         updateUI({ speed });
+         await sendMessage({ action: "SET_SPEED", speed });
       });
    });
 
-   // Handle reset
-   resetBtn.addEventListener("click", async () => {
-      const tab = await getActiveTab();
-      if (tab && tab.id) {
-         updateUI(1, undefined);
-         chrome.tabs.sendMessage(tab.id, {
-            action: "SET_SPEED",
-            speed: 1,
-         });
-      }
+   elements.resetBtn.addEventListener("click", async () => {
+      updateUI({ speed: 1.0 });
+      await sendMessage({ action: "SET_SPEED", speed: 1 });
    });
 
-   // Handle Auto-Skip Toggle
-   autoSkipToggle.addEventListener("change", async (e) => {
-      const isEnabled = e.target.checked;
-      const tab = await getActiveTab();
-      if (tab && tab.id) {
-         chrome.tabs.sendMessage(tab.id, {
-            action: "TOGGLE_AUTO_SKIP",
-            enabled: isEnabled,
-         });
-      }
+   elements.autoSkipToggle.addEventListener("change", async (e) => {
+      await sendMessage({ action: "TOGGLE_AUTO_SKIP", enabled: e.target.checked });
    });
 
-   // Handle badge click (to open YouTube)
-   displayBadge.addEventListener("click", () => {
-      // Check if it has the clickable class (Open YouTube mode)
-      if (displayBadge.classList.contains("clickable")) {
+   // NEW: Speed Ads Toggle
+   elements.speedAdsToggle.addEventListener("change", async (e) => {
+      await sendMessage({ action: "TOGGLE_SPEED_ADS", enabled: e.target.checked });
+   });
+
+   elements.volSlider.addEventListener("input", (e) => {
+      updateUI({ volume: parseFloat(e.target.value) });
+   });
+   elements.volSlider.addEventListener("change", async (e) => {
+      await sendMessage({ action: "SET_VOLUME", value: e.target.value });
+   });
+
+   elements.loopA.addEventListener("click", async () => {
+      const res = await sendMessage({ action: "SET_LOOP_POINT", point: "start" });
+      if (res) updateUI({ loop: res.loop });
+   });
+   elements.loopB.addEventListener("click", async () => {
+      const res = await sendMessage({ action: "SET_LOOP_POINT", point: "end" });
+      if (res) updateUI({ loop: res.loop });
+   });
+   elements.loopClear.addEventListener("click", async () => {
+      const res = await sendMessage({ action: "CLEAR_LOOP" });
+      if (res) updateUI({ loop: res.loop });
+   });
+
+   elements.displayBadge.addEventListener("click", () => {
+      if (elements.displayBadge.classList.contains("clickable")) {
          chrome.tabs.create({ url: "https://youtube.com" });
       }
    });
