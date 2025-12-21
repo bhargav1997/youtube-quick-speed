@@ -28,10 +28,10 @@ body {
 }
 
 .container {
-   padding: 20px;
+   padding: 16px;
    display: flex;
    flex-direction: column;
-   gap: 20px;
+   gap: 16px;
 }
 
 /* Header Styling */
@@ -39,7 +39,7 @@ header {
    display: flex;
    justify-content: space-between;
    align-items: center;
-   padding-bottom: 4px;
+   padding-bottom: 2px;
 }
 
 .title-group {
@@ -55,45 +55,69 @@ header {
 }
 
 h1 {
-   font-size: 16px;
+   font-size: 15px;
    font-weight: 600;
    margin: 0;
    color: var(--text-primary);
    letter-spacing: -0.02em;
 }
 
+/* Speed Badge / Action Button */
 .speed-badge {
    background-color: var(--success-bg);
    border: 1px solid rgba(62, 166, 255, 0.2);
-   padding: 4px 10px;
+   height: 28px;
+   padding: 0 10px;
    border-radius: 100px;
    font-size: 13px;
    font-weight: 600;
    color: var(--primary-color);
    min-width: 32px;
-   text-align: center;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   gap: 6px;
    transition: all 0.2s ease;
 }
 
-/* Clickable state for the badge (Open YouTube) */
+/* Icon styles within the badge */
+.speed-badge svg {
+   display: block;
+}
+
+/* Clickable state (Open YouTube) */
 .speed-badge.clickable {
    cursor: pointer;
    background-color: var(--btn-bg);
    color: var(--text-primary);
    border-color: var(--border-color);
+   padding: 0 8px; /* Slightly tighter for icons */
 }
 
 .speed-badge.clickable:hover {
-   background-color: var(--primary-color);
-   color: #000;
+   background-color: var(--card-bg); /* Lighter on hover */
    border-color: var(--primary-color);
+   color: var(--primary-color);
+   transform: translateY(-1px);
+   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.speed-badge.clickable:active {
+   transform: translateY(0);
+}
+
+.speed-badge.error {
+   background-color: rgba(255, 78, 69, 0.1) !important;
+   color: #ff4e45 !important;
+   border-color: rgba(255, 78, 69, 0.3) !important;
+   cursor: default;
 }
 
 /* Control Panel */
 .control-panel {
    background-color: var(--card-bg);
    border-radius: var(--radius-md);
-   padding: 16px;
+   padding: 12px;
    border: 1px solid var(--border-color);
    display: flex;
    flex-direction: column;
@@ -142,7 +166,7 @@ h1 {
    background-color: transparent;
    border: 1px dashed var(--border-color);
    color: var(--text-secondary);
-   padding: 8px;
+   padding: 6px;
    border-radius: var(--radius-sm);
    cursor: pointer;
    font-size: 12px;
@@ -156,33 +180,104 @@ h1 {
    background-color: rgba(255, 255, 255, 0.05);
 }
 
+/* Settings Panel */
+.settings-panel {
+   background-color: var(--card-bg);
+   border-radius: var(--radius-md);
+   padding: 10px 12px;
+   border: 1px solid var(--border-color);
+}
+
+.setting-row {
+   display: flex;
+   justify-content: space-between;
+   align-items: center;
+}
+
+.setting-label {
+   display: flex;
+   align-items: center;
+   gap: 8px;
+   font-size: 13px;
+   font-weight: 500;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+   position: relative;
+   display: inline-block;
+   width: 36px;
+   height: 20px;
+}
+
+.toggle-switch input {
+   opacity: 0;
+   width: 0;
+   height: 0;
+}
+
+.slider {
+   position: absolute;
+   cursor: pointer;
+   top: 0;
+   left: 0;
+   right: 0;
+   bottom: 0;
+   background-color: var(--btn-bg);
+   transition: 0.4s;
+   border-radius: 34px;
+   border: 1px solid var(--border-color);
+}
+
+.slider:before {
+   position: absolute;
+   content: "";
+   height: 14px;
+   width: 14px;
+   left: 2px;
+   bottom: 2px;
+   background-color: #888;
+   transition: 0.4s;
+   border-radius: 50%;
+}
+
+input:checked + .slider {
+   background-color: rgba(62, 166, 255, 0.2);
+   border-color: var(--primary-color);
+}
+
+input:checked + .slider:before {
+   transform: translateX(16px);
+   background-color: var(--primary-color);
+}
+
 /* Info Section */
 .info-section {
    border-top: 1px solid var(--border-color);
-   padding-top: 16px;
+   padding-top: 12px;
 }
 
 .info-section h2 {
-   font-size: 12px;
+   font-size: 11px;
    text-transform: uppercase;
    color: var(--text-secondary);
-   margin: 0 0 8px 0;
+   margin: 0 0 6px 0;
    letter-spacing: 0.05em;
 }
 
 .info-section p {
-   font-size: 13px;
+   font-size: 12px;
    color: var(--text-secondary);
-   margin: 0 0 12px 0;
+   margin: 0 0 10px 0;
    line-height: 1.4;
 }
 
 .tip-box {
    background-color: rgba(255, 255, 255, 0.05);
    border-radius: var(--radius-sm);
-   padding: 10px;
+   padding: 8px;
    display: flex;
-   gap: 10px;
+   gap: 8px;
    align-items: flex-start;
 }
 
@@ -192,7 +287,7 @@ h1 {
 }
 
 .tip-box .text {
-   font-size: 12px;
+   font-size: 11px;
    color: #cccccc;
    line-height: 1.4;
 }

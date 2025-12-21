@@ -1,50 +1,97 @@
 // Helper to find the video element
 const getVideo = () => document.querySelector("video");
 
-// State to track desired speed
+// State
 let targetSpeed = 1.0;
+let isAutoSkipEnabled = true; // Default: ON
 
-// Function to apply speed
+// ---------------------------------------------------------
+// SPEED CONTROL LOGIC
+// ---------------------------------------------------------
 const enforceSpeed = () => {
    const video = getVideo();
    if (video && !Number.isNaN(targetSpeed)) {
-      // Only update if difference is significant to avoid floating point loops
       if (Math.abs(video.playbackRate - targetSpeed) > 0.01) {
          video.playbackRate = targetSpeed;
-         // console.log(`[SpeedController] Applied speed: ${targetSpeed}x`);
       }
    }
 };
 
-// Listen for messages from popup
+// Periodic check for speed (YouTube resets it often)
+setInterval(() => {
+   const video = getVideo();
+   if (video) {
+      enforceSpeed();
+   }
+}, 1000);
+
+// Listen for navigation to re-enforce speed
+document.addEventListener("yt-navigate-finish", () => {
+   setTimeout(enforceSpeed, 500);
+});
+
+// ---------------------------------------------------------
+// AUTO-SKIP ADS LOGIC
+// ---------------------------------------------------------
+const skipAd = () => {
+   if (!isAutoSkipEnabled) return;
+
+   // Common selectors for YouTube skip buttons
+   const skipSelectors = [".ytp-ad-skip-button", ".ytp-ad-skip-button-modern", ".ytp-skip-ad-button"];
+
+   const skipBtn = document.querySelector(skipSelectors.join(","));
+
+   if (skipBtn) {
+      skipBtn.click();
+      // console.log('[SpeedController] Auto-skipped ad');
+   }
+};
+
+// Observer to detect ad buttons appearing in the DOM
+const adObserver = new MutationObserver((mutations) => {
+   if (!isAutoSkipEnabled) return;
+
+   // efficient check: only if nodes added
+   let shouldCheck = false;
+   for (const mutation of mutations) {
+      if (mutation.addedNodes.length > 0) {
+         shouldCheck = true;
+         break;
+      }
+   }
+
+   if (shouldCheck) {
+      skipAd();
+   }
+});
+
+// Start observing
+adObserver.observe(document.body, {
+   childList: true,
+   subtree: true,
+});
+
+// ---------------------------------------------------------
+// MESSAGE HANDLING
+// ---------------------------------------------------------
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
    if (request.action === "SET_SPEED") {
       targetSpeed = parseFloat(request.speed);
       enforceSpeed();
       sendResponse({ success: true, speed: targetSpeed });
-   } else if (request.action === "GET_SPEED") {
-      // If we have a video, verify its actual speed, otherwise return target
+   } else if (request.action === "GET_STATE") {
+      // Return both speed and skip setting
       const video = getVideo();
       const currentRate = video ? video.playbackRate : targetSpeed;
-      sendResponse({ speed: currentRate });
+      sendResponse({
+         speed: currentRate,
+         autoSkip: isAutoSkipEnabled,
+      });
+   } else if (request.action === "TOGGLE_AUTO_SKIP") {
+      isAutoSkipEnabled = request.enabled;
+      if (isAutoSkipEnabled) skipAd(); // Try skipping immediately if turned on
+      sendResponse({ success: true, autoSkip: isAutoSkipEnabled });
    }
 });
 
-// Periodic check to handle SPA navigation and AD interruptions
-// YouTube often resets playback rate or replaces the video element
-setInterval(() => {
-   const video = getVideo();
-   if (video) {
-      // If the video exists, ensure it matches our target speed
-      // This handles cases where YouTube resets it or a new video loads
-      enforceSpeed();
-   }
-}, 1000);
-
-// Also listen for SPA navigation events specifically to be more responsive
-document.addEventListener("yt-navigate-finish", () => {
-   // console.log('[SpeedController] Navigation finished, re-enforcing speed');
-   setTimeout(enforceSpeed, 500); // Small delay to let video load
-});
-
-console.log("[SpeedController] Loaded");
+console.log("[SpeedController] Loaded (Ad Skip Ready)");
