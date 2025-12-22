@@ -3,7 +3,7 @@
    "name": "YouTube Quick Speed",
    "version": "1.0",
    "description": "Control YouTube playback speed beyond default limits.",
-   "permissions": ["activeTab", "scripting"],
+   "permissions": ["activeTab", "scripting", "storage"],
    "host_permissions": ["*://*.youtube.com/*"],
    "action": {
       "default_popup": "popup.html",

@@ -5,7 +5,8 @@ document.addEventListener("DOMContentLoaded", () => {
       displayBadge: document.getElementById("current-speed-display"),
       resetBtn: document.getElementById("reset-btn"),
       autoSkipToggle: document.getElementById("auto-skip-toggle"),
-      speedAdsToggle: document.getElementById("speed-ads-toggle"), // NEW
+      speedAdsToggle: document.getElementById("speed-ads-toggle"),
+      zenModeToggle: document.getElementById("zen-mode-toggle"), // NEW
       volSlider: document.getElementById("vol-slider"),
       volValue: document.getElementById("vol-value"),
       loopA: document.getElementById("btn-loop-a"),
@@ -56,6 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Toggles
       if (state.autoSkip !== undefined) elements.autoSkipToggle.checked = state.autoSkip;
       if (state.speedAds !== undefined) elements.speedAdsToggle.checked = state.speedAds;
+      if (state.zenMode !== undefined) elements.zenModeToggle.checked = state.zenMode; // NEW
 
       // Volume
       if (state.volume !== undefined) {
@@ -133,9 +135,13 @@ document.addEventListener("DOMContentLoaded", () => {
       await sendMessage({ action: "TOGGLE_AUTO_SKIP", enabled: e.target.checked });
    });
 
-   // NEW: Speed Ads Toggle
    elements.speedAdsToggle.addEventListener("change", async (e) => {
       await sendMessage({ action: "TOGGLE_SPEED_ADS", enabled: e.target.checked });
+   });
+
+   // NEW: Zen Mode Toggle
+   elements.zenModeToggle.addEventListener("change", async (e) => {
+      await sendMessage({ action: "TOGGLE_ZEN_MODE", enabled: e.target.checked });
    });
 
    elements.volSlider.addEventListener("input", (e) => {

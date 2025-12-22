@@ -119,7 +119,7 @@ h1 {
    display: flex;
    align-items: center;
    justify-content: center;
-   gap: 8px; /* Increased gap */
+   gap: 8px;
 }
 .speed-badge.clickable {
    cursor: pointer;
@@ -326,4 +326,10 @@ input:checked + .slider {
 input:checked + .slider:before {
    transform: translateX(16px);
    background: var(--primary-color);
+}
+
+.divider {
+   height: 1px;
+   background-color: var(--border-color);
+   margin: 8px 0;
 }
