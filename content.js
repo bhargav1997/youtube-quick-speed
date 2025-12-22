@@ -67,38 +67,42 @@ const enforceSpeed = () => {
 
    // --- AD HANDLING ---
    if (adActive) {
-      // If speed-up ads feature is ON
+      // PRIORITY 1: SKIP
+      // User requested: "if button is visible then don't fast forward just skip"
+      if (state.isAutoSkipEnabled) {
+         const wasSkipped = skipAd();
+         if (wasSkipped) {
+            // If we found and clicked a button, stop processing this tick.
+            // We don't want to enforce speed while clicking.
+            return;
+         }
+      }
+
+      // PRIORITY 2: SPEED UP (Only if we couldn't skip yet)
       if (state.isSpeedAdEnabled) {
-         // If we just detected an ad and haven't sped it up yet
+         // Check if we are already in "Ad Speeding" mode
          if (!state.isAdSpeeding) {
-            // Save original state before modifying
             state.originalSpeed = state.targetSpeed;
             state.originalMuted = video.muted;
             state.isAdSpeeding = true;
-
-            // video.muted = true; // Mute
          }
 
-         // Enforce 16x speed constant during ad
-         // Using 16.0 as it's the max usually allowed/effective
+         // Enforce 16.0x
          if (video.playbackRate !== 16.0) video.playbackRate = 16.0;
          if (!video.muted) video.muted = true;
       }
-
-      // Also run skip logic if enabled (for skippable ads)
-      if (state.isAutoSkipEnabled) skipAd();
    }
 
    // --- NORMAL VIDEO HANDLING ---
    else {
-      // If we were speeding an ad and it just ended, restore state
+      // Restore state if we were speeding
       if (state.isAdSpeeding) {
          video.muted = state.originalMuted;
          video.playbackRate = state.originalSpeed;
          state.isAdSpeeding = false;
       }
 
-      // Enforce user target speed if normal video
+      // Enforce user target speed
       if (!Number.isNaN(state.targetSpeed)) {
          if (Math.abs(video.playbackRate - state.targetSpeed) > 0.01) {
             video.playbackRate = state.targetSpeed;
@@ -127,32 +131,46 @@ const checkLoop = () => {
 // AUTO-SKIP ADS LOGIC (Button Clicker)
 // ---------------------------------------------------------
 const triggerClick = (el) => {
-   // Try native click
-   el.click();
-
-   // Try synthesized event (sometimes YouTube blocks native .click())
-   const mouseEvent = new MouseEvent("click", {
-      bubbles: true,
-      cancelable: true,
-      view: window,
-   });
+   if (!el) return;
+   el.click(); // Native click
+   // Synthetic fallback
+   const mouseEvent = new MouseEvent("click", { bubbles: true, cancelable: true, view: window });
    el.dispatchEvent(mouseEvent);
 };
 
 const skipAd = () => {
-   // 1. Check for modern skip buttons
-   const skipBtn = document.querySelector(".ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern");
-   if (skipBtn) {
-      triggerClick(skipBtn);
-      return;
+   // 1. Standard Classes
+   let skipBtn = document.querySelector(".ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern");
+
+   // 2. ID Fallback (Based on user report "skip-button:jf")
+   if (!skipBtn) {
+      // Finds elements with ID starting with "skip-button"
+      skipBtn = document.querySelector('button[id^="skip-button"]');
    }
 
-   // 2. Check for overlays (sometimes the button is wrapped)
-   const overlay = document.querySelector(".ytp-ad-player-overlay-layout__skip-or-preview-container");
-   if (overlay) {
-      const btn = overlay.querySelector("button");
-      if (btn) triggerClick(btn);
+   // 3. Text/Overlay Fallback (If logic obfuscated)
+   if (!skipBtn) {
+      // Look inside user-reported overlay container
+      const overlay = document.querySelector(".ytp-ad-player-overlay-layout__skip-or-preview-container");
+      if (overlay) {
+         // Look for any button with text "Skip" in the specific ad container
+         const btns = overlay.querySelectorAll("button");
+         for (const btn of btns) {
+            if (btn.textContent && btn.textContent.includes("Skip")) {
+               skipBtn = btn;
+               break;
+            }
+         }
+      }
    }
+
+   // 4. Final Safety: Check if it's visible
+   if (skipBtn && (skipBtn.offsetParent !== null || skipBtn.style.display !== "none")) {
+      triggerClick(skipBtn);
+      return true; // Signal that we clicked
+   }
+
+   return false; // Did not click
 };
 
 // Aggressive Polling during Ads
