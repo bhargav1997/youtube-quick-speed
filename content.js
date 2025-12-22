@@ -51,7 +51,12 @@ const setVolume = (val) => {
 
 const isAdPlaying = () => {
    const player = document.querySelector(".html5-video-player");
-   return player && player.classList.contains("ad-showing");
+   const adShowing = player && player.classList.contains("ad-showing");
+
+   // Manage polling based on ad state
+   manageAdInterval(adShowing);
+
+   return adShowing;
 };
 
 const enforceSpeed = () => {
@@ -121,17 +126,67 @@ const checkLoop = () => {
 // ---------------------------------------------------------
 // AUTO-SKIP ADS LOGIC (Button Clicker)
 // ---------------------------------------------------------
+const triggerClick = (el) => {
+   // Try native click
+   el.click();
+
+   // Try synthesized event (sometimes YouTube blocks native .click())
+   const mouseEvent = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+   });
+   el.dispatchEvent(mouseEvent);
+};
+
 const skipAd = () => {
-   const skipSelectors = [".ytp-ad-skip-button", ".ytp-ad-skip-button-modern", ".ytp-skip-ad-button"];
-   const skipBtn = document.querySelector(skipSelectors.join(","));
-   if (skipBtn) skipBtn.click();
+   // 1. Check for modern skip buttons
+   const skipBtn = document.querySelector(".ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern");
+   if (skipBtn) {
+      triggerClick(skipBtn);
+      return;
+   }
+
+   // 2. Check for overlays (sometimes the button is wrapped)
+   const overlay = document.querySelector(".ytp-ad-player-overlay-layout__skip-or-preview-container");
+   if (overlay) {
+      const btn = overlay.querySelector("button");
+      if (btn) triggerClick(btn);
+   }
+};
+
+// Aggressive Polling during Ads
+// MutationObserver is fast, but sometimes fails if the node is already there but hidden.
+// We use a short interval ONLY when an ad is actually detected.
+let adInterval = null;
+
+const manageAdInterval = (isAd) => {
+   if (isAd && !adInterval) {
+      adInterval = setInterval(() => {
+         if (state.isAutoSkipEnabled) skipAd();
+         // Also ensure 16x speed is enforced repeatedly
+         enforceSpeed();
+      }, 500); // Check every 500ms while ad is active
+   } else if (!isAd && adInterval) {
+      clearInterval(adInterval);
+      adInterval = null;
+   }
 };
 
 // Observer to catch ad state changes quickly
 const adObserver = new MutationObserver((mutations) => {
-   // Check if player classlist changed (ad-showing)
-   // Or if new nodes (skip button) added
+   const adActive = isAdPlaying();
+   manageAdInterval(adActive);
+
+   // Check if we need to enforce speed (ad-showing class)
+   // Or if the skip button appeared
    enforceSpeed();
+
+   // Explicitly check for skip button on every mutation
+   // This is cheap because querySelector is fast
+   if (state.isAutoSkipEnabled) {
+      skipAd();
+   }
 });
 
 adObserver.observe(document.body, {
