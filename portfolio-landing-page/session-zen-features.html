@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Features Deep Dive | Session Zen</title>
+
+    <!-- SEO -->
+    <meta name="description"
+        content="Explore Session Zen: The ultimate tab manager and focus tool for Chrome. Organize tabs, save memory, and block distractions.">
+    <meta name="robots" content="index, follow">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Make Chrome Chaos-Free with Session Zen">
+    <meta property="og:description"
+        content="Stop drowning in tabs. Save sessions, block distractions, and track your focus.">
+    <meta property="og:image"
+        content="https://bhargav1997.github.io/youtube-quick-speed/portfolio-landing-page/icon.png">
+
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Specific styles for feature page */
+        .feature-hero {
+            padding: 140px 0 80px;
+            text-align: center;
+        }
+
+        .feature-block {
+            padding: 80px 0;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .feature-block:last-child {
+            border-bottom: none;
+        }
+
+        .f-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .f-content h2 {
+            font-size: 2.2rem;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+
+        .f-content h3 {
+            font-size: 1.1rem;
+            color: var(--accent-blue);
+            /* Zen Blue */
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .f-text {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            font-size: 1.05rem;
+        }
+
+        .f-visual {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 5rem;
+            color: var(--accent-blue);
+        }
+
+        @media (max-width: 768px) {
+            .f-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .f-order-2 {
+                order: 2;
+            }
+
+            .f-order-1 {
+                order: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <a href="index.html" class="logo">Productivity<span class="highlight">Suite</span></a>
+            <div class="nav-links">
+                <a href="index.html#quick-speed">YouTube Quick Speed</a>
+                <a href="index.html#session-zen">Session Zen</a>
+            </div>
+            <a href="index.html" class="btn btn-sm btn-secondary">Back to Home</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="feature-hero">
+        <div class="container">
+            <div class="badge reveal" style="color: var(--accent-blue);">Focus & Organization</div>
+            <h1 class="reveal delay-100">Restore Order with <br><span class="text-gradient"
+                    style="background: var(--gradient-zen); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Session
+                    Zen</span></h1>
+            <p class="hero-sub reveal delay-200">Stop drowning in tabs. A smart workspace manager for the modern
+                professional.</p>
+        </div>
+    </section>
+
+    <!-- Content Blocks -->
+    <div class="container">
+
+        <!-- Feature 1: Tab Management -->
+        <div class="feature-block reveal">
+            <div class="f-grid">
+                <div class="f-content">
+                    <h3>The Problem</h3>
+                    <h2>Tab Overload & Memory Leaks</h2>
+                    <p class="f-text">We've all been there: 50+ tabs open, browser lagging, fan spinning. You're afraid
+                        to close them because you might lose important research.</p>
+
+                    <h3>The Solution</h3>
+                    <h2>One-Click Snapshot</h2>
+                    <p class="f-text">Instantly name and save your current window as a "Session". Close everything to
+                        free up RAM. Restore it all with one click later. Perfect for switching between "Project A",
+                        "Research", and "Entertainment".</p>
+                </div>
+                <div class="f-visual">
+                    <i class="fa-solid fa-layer-group"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 2: Focus Mode -->
+        <div class="feature-block reveal">
+            <div class="f-grid">
+                <div class="f-visual f-order-2">
+                    <i class="fa-regular fa-eye-slash"></i>
+                </div>
+                <div class="f-content f-order-1">
+                    <h3>The Problem</h3>
+                    <h2>The "Quick Check" Trap</h2>
+                    <p class="f-text">"I'll just check Twitter for a second..." turns into 30 minutes of scrolling.
+                        Discipline relies on willpower, which runs out.</p>
+
+                    <h3>The Solution</h3>
+                    <h2>Hardcore Focus Mode</h2>
+                    <p class="f-text">Activate Focus Mode to block distracting sites for a set duration. No bypasses.
+                        Just your work. Includes a "Break Mode" for guilt-free 5-minute intervals.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 3: Analytics -->
+        <div class="feature-block reveal">
+            <div class="f-grid">
+                <div class="f-content">
+                    <h3>The Issue</h3>
+                    <h2>Time Blindness</h2>
+                    <p class="f-text">You feel busy, but what did you actually accomplish? Without data, it's hard to
+                        optimize your workflow.</p>
+
+                    <h3>The Solution</h3>
+                    <h2>Browsing Analytics</h2>
+                    <p class="f-text">Visualize your habits. See exactly how much time you spent on productivity tools
+                        vs. social media. Gamify your focus streaks.</p>
+                </div>
+                <div class="f-visual">
+                    <i class="fa-solid fa-chart-pie"></i>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Final CTA -->
+    <section class="final-cta section" style="text-align: center;">
+        <div class="container">
+            <h2>Reclaim Your Browser</h2>
+            <p>Join students and developers who save 95% RAM and gain 100% focus.</p>
+            <a href="https://chromewebstore.google.com/detail/cdcljemgcagajiifokjfnpcjllfbdonj?utm_source=item-share-cb"
+                class="btn btn-secondary" target="_blank">
+                <i class="fa-brands fa-chrome"></i> Install Session Zen
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">ProductivitySuite</div>
+                <div class="footer-links">
+                    <span class="copyright">© 2024 Productivity Extensions. All rights reserved.</span>
+                    <a href="index.html" class="footer-meta-link">Main Portfolio</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>

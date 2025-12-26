@@ -53,6 +53,22 @@ This extension operates **100% locally** on your machine.
 -  **Vanilla JS**: No heavy frameworks, ensuring lightweight and fast performance.
 -  **CSS3**: Modern styling variables for a consistent dark theme.
 
+## 🤝 Contributing
+
+This project is fully **Open Source** and we welcome contributions from the community!
+
+Whether you're fixing a bug, improving the UI, or adding a new feature (like cloud sync or more automation), we'd love your help.
+
+### How to Contribute
+
+1. **Fork** the repository.
+2. Create a new branch (`git checkout -b feature/AmazingFeature`).
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`).
+4. Push to the branch (`git push origin feature/AmazingFeature`).
+5. Open a **Pull Request**.
+
+Don't hesitate to open an Issue if you have ideas or find bugs!
+
 ## 📝 License
 
-This project is open source and available under the [MIT License](LICENSE).
+This project is open source and available under the [MIT License](LICENSE). Feel free to use, modify, and distribute as you see fit.

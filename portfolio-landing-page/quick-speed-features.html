@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Features Deep Dive | YouTube Quick Speed</title>
+
+    <!-- SEO -->
+    <meta name="description"
+        content="In-depth look at YouTube Quick Speed features: Playback Control, Looping, Volume Boost, and Zen Mode. Learn how to optimize your viewing workflow.">
+    <meta name="robots" content="index, follow">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Why You Need YouTube Quick Speed">
+    <meta property="og:description"
+        content="Detailed breakdown: 16x speed, A-B looping, and distraction blocking for YouTube.">
+    <meta property="og:image"
+        content="https://bhargav1997.github.io/youtube-quick-speed/portfolio-landing-page/icon.png">
+
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Specific styles for feature page */
+        .feature-hero {
+            padding: 140px 0 80px;
+            text-align: center;
+        }
+
+        .feature-block {
+            padding: 80px 0;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .feature-block:last-child {
+            border-bottom: none;
+        }
+
+        .f-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .f-content h2 {
+            font-size: 2.2rem;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+
+        .f-content h3 {
+            font-size: 1.1rem;
+            color: var(--accent-orange);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .f-text {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            font-size: 1.05rem;
+        }
+
+        .f-visual {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 5rem;
+            color: var(--accent-teal);
+        }
+
+        @media (max-width: 768px) {
+            .f-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .f-order-2 {
+                order: 2;
+            }
+
+            .f-order-1 {
+                order: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <a href="index.html" class="logo">Productivity<span class="highlight">Suite</span></a>
+            <div class="nav-links">
+                <a href="index.html#quick-speed">YouTube Quick Speed</a>
+                <a href="index.html#session-zen">Session Zen</a>
+            </div>
+            <a href="index.html" class="btn btn-sm btn-secondary">Back to Home</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="feature-hero">
+        <div class="container">
+            <div class="badge reveal">Feature Deep Dive</div>
+            <h1 class="reveal delay-100">Why You Need <br><span class="text-gradient">YouTube Quick Speed</span></h1>
+            <p class="hero-sub reveal delay-200">A detailed breakdown of how each tool transforms your viewing
+                experience.</p>
+        </div>
+    </section>
+
+    <!-- Content Blocks -->
+    <div class="container">
+
+        <!-- Feature 1: Speed -->
+        <div class="feature-block reveal">
+            <div class="f-grid">
+                <div class="f-content">
+                    <h3>The Problem</h3>
+                    <h2>YouTube's Default Speed Limit</h2>
+                    <p class="f-text">Standard players limit you to 2x speed. For fast readers and skimmers, this is
+                        often too slow. Navigating through menus to change speed breaks your flow.</p>
+
+                    <h3>The Solution</h3>
+                    <h2>Precision Speed Control</h2>
+                    <p class="f-text">We unlock speeds up to 16x. Whether you want to breeze through a lecture at 2.5x
+                        or analyze a sports play at 0.5x, you have total control via hotkeys (S / D) without ever
+                        touching your mouse.</p>
+                </div>
+                <div class="f-visual">
+                    <i class="fa-solid fa-gauge-high"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 2: Looping -->
+        <div class="feature-block reveal">
+            <div class="f-grid">
+                <div class="f-visual f-order-2">
+                    <i class="fa-solid fa-rotate"></i>
+                </div>
+                <div class="f-content f-order-1">
+                    <h3>The Need</h3>
+                    <h2>Learning by Repetition</h2>
+                    <p class="f-text">Trying to learn a guitar riff, a coding concept, or a dance move? Manually
+                        dragging the seeker bar back every 10 seconds is frustrating and inaccurate.</p>
+
+                    <h3>The Solution</h3>
+                    <h2>A-B Loop System</h2>
+                    <p class="f-text">Mark a start point (A) and an end point (B). The video will loop that specific
+                        section indefinitely. It's the ultimate tool for musicians, students, and self-learners.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 3: Volume -->
+        <div class="feature-block reveal">
+            <div class="f-grid">
+                <div class="f-content">
+                    <h3>The Issue</h3>
+                    <h2>Quiet Audio Recordings</h2>
+                    <p class="f-text">Some uploads are just too quiet, even at 100% system volume. This is especially
+                        problematic on laptops or in noisy environments.</p>
+
+                    <h3>The Solution</h3>
+                    <h2>Volume Boost</h2>
+                    <p class="f-text">Push beyond the limit. Our audio engine allows you to boost volume up to 600%,
+                        ensuring you never miss a word.</p>
+                </div>
+                <div class="f-visual">
+                    <i class="fa-solid fa-volume-high"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 4: Zen Mode -->
+        <div class="feature-block reveal">
+            <div class="f-grid">
+                <div class="f-visual f-order-2">
+                    <i class="fa-solid fa-eye-slash"></i>
+                </div>
+                <div class="f-content f-order-1">
+                    <h3>The Distraction</h3>
+                    <h2>The Sidebar Trap</h2>
+                    <p class="f-text">YouTube is designed to keep you clicking. Recommended videos, comments, and shorts
+                        are constantly fighting for your attention.</p>
+
+                    <h3>The Solution</h3>
+                    <h2>Zen Mode</h2>
+                    <p class="f-text">One click (Z) hides everything except the video player. No comments, no sidebar,
+                        no distractions. Just you and the content you came for.</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Final CTA -->
+    <section class="final-cta section" style="text-align: center;">
+        <div class="container">
+            <h2>Experience the Difference</h2>
+            <p>Once you try it, you won't go back to the standard player.</p>
+            <a href="https://chromewebstore.google.com/detail/fgfnblagkjbhdkdomhgjhljdaekajocg?utm_source=item-share-cb"
+                class="btn btn-primary" target="_blank">
+                <i class="fa-brands fa-chrome"></i> Install YouTube Quick Speed
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">ProductivitySuite</div>
+                <div class="footer-links">
+                    <span class="copyright">© 2024 Productivity Extensions. All rights reserved.</span>
+                    <a href="privacy-policy.html" class="footer-meta-link">Privacy Policy</a>
+                    <a href="index.html" class="footer-meta-link">Main Portfolio</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>
