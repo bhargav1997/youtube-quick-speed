@@ -2,6 +2,8 @@
 
 A powerful Chrome Extension to take full control of your YouTube viewing experience. Watch videos faster, boost volume, loop sections for learning, and automate ad skipping/speeding.
 
+👉 **Try it here:** [https://youtube-quick-speed.vercel.app/](https://youtube-quick-speed.vercel.app/)
+
 ## 🚀 Features
 
 -  **🏎 Precise Speed Control**: Set playback speed up to **4x** (beyond YouTube's default 2x limit).
@@ -16,7 +18,9 @@ A powerful Chrome Extension to take full control of your YouTube viewing experie
 
 ### From Chrome Web Store
 
-_(Link to be added once published)_
+### From Chrome Web Store
+
+[**Direct Download Link**](https://chromewebstore.google.com/detail/fgfnblagkjbhdkdomhgjhljdaekajocg?utm_source=item-share-cb)
 
 ### Manual Installation (Developer Mode)
 
@@ -56,6 +60,8 @@ This extension operates **100% locally** on your machine.
 ## 🤝 Contributing
 
 This project is fully **Open Source** and we welcome contributions from the community!
+
+**Repository:** [https://github.com/bhargav1997/youtube-quick-speed](https://github.com/bhargav1997/youtube-quick-speed)
 
 Whether you're fixing a bug, improving the UI, or adding a new feature (like cloud sync or more automation), we'd love your help.
 
