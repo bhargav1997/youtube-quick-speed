@@ -18,8 +18,6 @@ A powerful Chrome Extension to take full control of your YouTube viewing experie
 
 ### From Chrome Web Store
 
-### From Chrome Web Store
-
 [**Direct Download Link**](https://chromewebstore.google.com/detail/fgfnblagkjbhdkdomhgjhljdaekajocg?utm_source=item-share-cb)
 
 ### Manual Installation (Developer Mode)
