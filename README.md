@@ -1,8 +1,15 @@
 # YouTube Quick Speed ⚡️
 
+[![GitHub](https://img.shields.io/github/stars/bhargav1997/youtube-quick-speed?style=social)](https://github.com/bhargav1997/youtube-quick-speed/stargazers)
+[![GitHub](https://img.shields.io/github/forks/bhargav1997/youtube-quick-speed?style=social)](https://github.com/bhargav1997/youtube-quick-speed/network/members)
+[![GitHub](https://img.shields.io/github/watchers/bhargav1997/youtube-quick-speed?style=social)](https://github.com/bhargav1997/youtube-quick-speed/watchers)
+[![GitHub](https://img.shields.io/github/issues/bhargav1997/youtube-quick-speed?style=social)](https://github.com/bhargav1997/youtube-quick-speed/issues)
+
 A powerful Chrome Extension to take full control of your YouTube viewing experience. Watch videos faster, boost volume, loop sections for learning, and automate ad skipping/speeding.
 
 👉 **Try it here:** [https://youtube-quick-speed.vercel.app/](https://youtube-quick-speed.vercel.app/)
+
+![YouTube Quick Speed](thumbnail.png)
 
 ## 🚀 Features
 
