@@ -1,8 +1,8 @@
 {
    "manifest_version": 3,
-   "name": "YouTube Quick Speed",
-   "version": "1.1.0",
-   "description": "Control YouTube playback speed beyond default limits.",
+   "name": "YouTube Quick Speed & Loop Control",
+   "version": "1.2.0",
+   "description": "Control playback speed (up to 16x), fast forward ads, loop video sections, and boost volume on YouTube. Privacy-first, no tracking.",
    "permissions": ["activeTab", "scripting", "storage"],
    "host_permissions": ["*://www.youtube.com/*", "*://m.youtube.com/*"],
    "action": {
