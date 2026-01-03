@@ -15,12 +15,80 @@ let state = {
    boostKey: "Shift",
    boostSpeed: 2.5,
 
+   // Focus Filter State
+   isFocusModeEnabled: false, // Default: OFF
+   isStrictModeEnabled: false,
+   focusKeywords: [], // Array of lowercase strings
+   activeCategories: [], // Array of active category IDs (e.g. ['food', 'tech'])
+   customCategories: [], // Array of { id, name, keywords[], icon }
+   isMirrored: false,
+
    // Internal state
    originalSpeed: 1.0,
    originalMuted: false,
    isAdSpeeding: false,
    adSkipClicked: false,
    isKeyBoosting: false,
+};
+
+// CATEGORY DEFINITIONS
+const PRESET_CATEGORIES = {
+   food: ["food", "cooking", "recipe", "kitchen", "chef", "meal", "eating", "mukbang", "taste test", "street food", "restaurant"],
+   tech: [
+      "tech",
+      "technology",
+      "gadget",
+      "smartphone",
+      "iphone",
+      "android",
+      "review",
+      "unboxing",
+      "software",
+      "coding",
+      "programming",
+      "computer",
+      "pc build",
+   ],
+   ai: [
+      "ai",
+      "artificial intelligence",
+      "chatgpt",
+      "midjourney",
+      "llm",
+      "openai",
+      "machine learning",
+      "robot",
+      "automation",
+      "future tech",
+   ],
+   spiritual: [
+      "spiritual",
+      "meditation",
+      "yoga",
+      "chakra",
+      "manifestation",
+      "astrology",
+      "tarot",
+      "psychic",
+      "healing",
+      "guru",
+      "awakening",
+   ],
+   gaming: [
+      "gaming",
+      "gameplay",
+      "walkthrough",
+      "streamer",
+      "twitch",
+      "esports",
+      "minecraft",
+      "roblox",
+      "fortnite",
+      "playstation",
+      "xbox",
+      "nintendo",
+   ],
+   shorts: ["#shorts", "shorts"], // Special handling might be needed for actual shorts shelf, but keywords help too
 };
 
 let cachedIsAdPlaying = false;
@@ -104,6 +172,13 @@ const saveSettings = () => {
       isZenModeEnabled: state.isZenModeEnabled,
       isBoosterEnabled: state.isBoosterEnabled,
       volume: state.volume,
+      // Focus Persistence
+      isFocusModeEnabled: state.isFocusModeEnabled,
+      isStrictModeEnabled: state.isStrictModeEnabled,
+      focusKeywords: state.focusKeywords,
+      activeCategories: state.activeCategories,
+      customCategories: state.customCategories,
+      isMirrored: state.isMirrored,
    };
    chrome.storage.local.set({ [STORAGE_KEY]: settings });
 };
@@ -116,14 +191,32 @@ const loadSettings = () => {
          if (saved.isAutoSkipEnabled !== undefined) state.isAutoSkipEnabled = saved.isAutoSkipEnabled;
          if (saved.isSpeedAdEnabled !== undefined) state.isSpeedAdEnabled = saved.isSpeedAdEnabled;
          if (saved.isBoosterEnabled !== undefined) state.isBoosterEnabled = saved.isBoosterEnabled;
+
+         // Load Focus
+         if (saved.isFocusModeEnabled !== undefined) state.isFocusModeEnabled = saved.isFocusModeEnabled;
+         if (saved.isStrictModeEnabled !== undefined) state.isStrictModeEnabled = saved.isStrictModeEnabled;
+         if (saved.focusKeywords !== undefined) state.focusKeywords = saved.focusKeywords;
+         if (saved.activeCategories !== undefined) state.activeCategories = saved.activeCategories;
+         if (saved.customCategories !== undefined) state.customCategories = saved.customCategories;
+
          if (saved.volume !== undefined) {
             state.volume = saved.volume;
             setVolume(state.volume);
          }
+
+         // Visual settings
          if (saved.isZenModeEnabled !== undefined) {
             state.isZenModeEnabled = saved.isZenModeEnabled;
             toggleZenMode(state.isZenModeEnabled);
          }
+
+         if (saved.isMirrored !== undefined) {
+            state.isMirrored = saved.isMirrored;
+            toggleMirror(state.isMirrored);
+         }
+
+         // Trigger filter on load
+         if (state.isFocusModeEnabled) runFocusFilter();
       }
    });
 };
@@ -147,7 +240,20 @@ const updateZenStyle = (enabled) => {
                 ytd-engagement-panel-section-list-renderer,
                 panel-ad-header-image-lockup-view-model,
                 ytd-ad-slot-renderer,
-                .ytd-ad-slot-renderer {
+                .ytd-ad-slot-renderer,
+                ytd-rich-item-renderer:has(.ytd-ad-slot-renderer),
+                ytd-rich-item-renderer:has(ytd-ad-slot-renderer),
+                #masthead-ad,
+                ytd-banner-promo-renderer,
+                ytd-statement-banner-renderer,
+                ytd-in-feed-ad-layout-renderer,
+                ytd-merch-shelf-renderer,
+                ytd-display-ad-renderer,
+                .ytd-display-ad-renderer,
+                #player-ads,
+                #offer-module,
+                .video-ads,
+                .ytp-ad-module {
                     display: none !important;
                     visibility: hidden !important;
                 }
@@ -156,6 +262,13 @@ const updateZenStyle = (enabled) => {
                     margin: 0 auto !important;
                     min-width: 0 !important;
                     flex: 1;
+                    justify-content: center;
+                }
+                
+                /* Ensure player is centered and focused */
+                #player-container-outer {
+                    max-width: 100% !important;
+                    margin: 0 auto !important;
                 }
             `;
          (document.head || document.documentElement).appendChild(style);
@@ -164,6 +277,46 @@ const updateZenStyle = (enabled) => {
       if (style) {
          style.remove();
       }
+   }
+};
+
+const toggleMirror = (enabled) => {
+   state.isMirrored = enabled;
+   const video = getVideo();
+   if (video) {
+      if (enabled) {
+         video.style.transform = "scaleX(-1)";
+      } else {
+         video.style.transform = "";
+      }
+   }
+};
+
+const takeSnapshot = () => {
+   const video = getVideo();
+   if (!video) return;
+
+   try {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+
+      // If mirrored, flip the context too so screenshot matches view
+      if (state.isMirrored) {
+         ctx.translate(canvas.width, 0);
+         ctx.scale(-1, 1);
+      }
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const dataURL = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.download = `snapshot_${Date.now()}.png`;
+      link.href = dataURL;
+      link.click();
+   } catch (e) {
+      console.error("Snapshot failed", e);
    }
 };
 
@@ -446,84 +599,6 @@ const enforceSpeed = () => {
    }
 };
 
-// ---------------------------------------------------------
-// PRECISE SKIP LOGIC (Gold Standard)
-// ---------------------------------------------------------
-// const skipAd = () => {
-//    // 1. STANDARD SELECTORS
-//    const selectors = [
-//       ".ytp-skip-ad-button",
-//       ".ytp-ad-skip-button",
-//       ".ytp-ad-skip-button-modern",
-//       ".ytp-ad-overlay-close-button",
-//       ".video-ad-label",
-//       "button[id^='skip-button']",
-//    ];
-
-//    const candidates = Array.from(document.querySelectorAll(selectors.join(",")));
-
-//    // 2. TEXT-BASED SEARCH (Nuclear Option)
-//    try {
-//       // Specific structure from user: <button><div>Skip</div></button>
-//       const specificXpath = "//button[descendant::div[text()='Skip']]";
-//       const specificCandidates = document.evaluate(specificXpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-//       for (let i = 0; i < specificCandidates.snapshotLength; i++) {
-//          candidates.push(specificCandidates.snapshotItem(i));
-//       }
-
-//       // General text fallback
-//       const xpath = "//button[contains(., 'Skip') or contains(., 'Ad')]";
-//       const textCandidates = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-//       for (let i = 0; i < textCandidates.snapshotLength; i++) {
-//          candidates.push(textCandidates.snapshotItem(i));
-//       }
-
-//       // Check for div-based buttons
-//       const divXpath = "//div[contains(., 'Skip Ad')]";
-//       const divCandidates = document.evaluate(divXpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-//       for (let i = 0; i < divCandidates.snapshotLength; i++) {
-//          const node = divCandidates.snapshotItem(i);
-//          if (node.getAttribute("role") === "button" || node.className.includes("button") || node.className.includes("btn")) {
-//             candidates.push(node);
-//          }
-//       }
-//    } catch (e) {}
-
-//    const isFullscreen = document.fullscreenElement !== null;
-//    const player = document.querySelector(".html5-video-player");
-//    const controlsHidden = player && player.classList.contains("ytp-autohide");
-
-//    for (const btn of candidates) {
-//       if (!btn) continue;
-
-//       const style = window.getComputedStyle(btn);
-//       let visible = style.display !== "none" && style.visibility !== "hidden" && !btn.disabled;
-
-//       if (visible && !isFullscreen) {
-//          if (btn.getBoundingClientRect().width === 0) visible = false;
-//       }
-
-//       // Relax checks in fullscreen OR if controls hidden OR found via text
-//       //   if (visible && !isFullscreen && !controlsHidden) {
-//       //      if (btn.getBoundingClientRect().width === 0) visible = false;
-//       //   }
-
-//       if (visible) {
-//          // console.log("[SpeedController] Clicking Skip Button");
-//          btn.click();
-
-//          //  const commonProps = { bubbles: true, cancelable: true, view: window };
-//          //  btn.dispatchEvent(new MouseEvent("mousedown", commonProps));
-//          //  btn.dispatchEvent(new MouseEvent("mouseup", commonProps));
-//          //  btn.dispatchEvent(new MouseEvent("click", commonProps));
-
-//          state.adSkipClicked = true;
-//          return true;
-//       }
-//    }
-//    return false;
-// };
-
 const skipAd = () => {
    const selectors = [".ytp-skip-ad-button", ".ytp-ad-skip-button", ".ytp-ad-skip-button-modern", "button[id^='skip-button']"];
 
@@ -621,6 +696,218 @@ const checkLoop = () => {
 };
 
 // ---------------------------------------------------------
+// FOCUS FILTER LOGIC (NEW)
+// ---------------------------------------------------------
+
+/**
+ * Checks if a string contains any of the blocked keywords
+ * @param {string} text
+ * @returns {boolean}
+ */
+const containsKeyword = (text) => {
+   if (!text || typeof text !== "string") return false;
+   const lowerText = text.toLowerCase();
+
+   // Exact match word boundary check or simple includes?
+   // Simple includes is safer for broad filtering initially requested (e.g. "politics").
+
+   // 1. Check Custom Keywords
+   if (state.focusKeywords.some((keyword) => lowerText.includes(keyword.toLowerCase()))) {
+      return true;
+   }
+
+   // 2. Check Active Categories (Both Preset and Custom)
+   if (state.activeCategories && state.activeCategories.length > 0) {
+      for (const catId of state.activeCategories) {
+         let keywords = [];
+
+         // Check if it's a Preset
+         if (PRESET_CATEGORIES[catId]) {
+            keywords = PRESET_CATEGORIES[catId];
+         }
+         // Check if it's a Custom Category
+         else {
+            const customCat = state.customCategories.find((c) => c.id === catId);
+            if (customCat && customCat.keywords) {
+               keywords = customCat.keywords;
+            }
+         }
+
+         if (keywords && keywords.some((k) => lowerText.includes(k.toLowerCase()))) {
+            return true;
+         }
+      }
+   }
+
+   return false;
+};
+
+/**
+ * Main filtering function
+ */
+const runFocusFilter = () => {
+   if (!state.isFocusModeEnabled) return;
+
+   // Proceed if we have keywords OR active categories
+   const hasKeywords = state.focusKeywords && state.focusKeywords.length > 0;
+   const hasCategories = state.activeCategories && state.activeCategories.length > 0;
+
+   if (!hasKeywords && !hasCategories) return;
+
+   // Selectors for Video Cards (Grid, List, Recommendations)
+   // ytd-rich-item-renderer: Homepage grid items
+   // ytd-compact-video-renderer: Sidebar recommendations
+   // ytd-video-renderer: Search results
+   // ytd-grid-video-renderer: Channel videos
+   // ytm-video-with-context-renderer: Mobile/Modern grid
+   // ytd-reel-item-renderer: Shorts in grid
+
+   const cardSelectors = [
+      "ytd-rich-item-renderer",
+      "ytd-compact-video-renderer",
+      "ytd-video-renderer",
+      "ytd-grid-video-renderer",
+      "ytd-reel-item-renderer",
+      "ytm-video-with-context-renderer",
+   ];
+
+   const cards = document.querySelectorAll(cardSelectors.join(","));
+
+   cards.forEach((card) => {
+      // Skip if already processed
+      if (card.dataset.yqsFiltered === "true") return;
+
+      // Extract Text
+      // Title selector tries to find the main text.
+      // #video-title often holds the title text.
+      const titleEl = card.querySelector("#video-title") || card.querySelector("h3") || card.querySelector(".title");
+      const titleText = titleEl ? titleEl.textContent + " " + titleEl.getAttribute("title") : "";
+
+      // Description/Snippet (for search results)
+      // #description-text or specific metadata
+      const descEl = card.querySelector("#description-text") || card.querySelector(".metadata-snippet-text");
+      const descText = descEl ? descEl.textContent : "";
+
+      const fullText = (titleText + " " + descText).trim();
+
+      if (fullText && containsKeyword(fullText)) {
+         applyFilterAction(card);
+      }
+   });
+
+   // Shorts Shelf Special Handling (ytd-rich-shelf-renderer often holds shorts)
+   // If strict on "shorts", we might want to hide the whole shelf if title matches or just items.
+   // This is optional advanced logic, but good to have.
+};
+
+const applyFilterAction = (card) => {
+   card.dataset.yqsFiltered = "true"; // Mark processed
+
+   // Determine the container to blur (fallback to card if specific container not found)
+   const targetContainer = card.querySelector("#content") || card.querySelector("#dismissible") || card;
+
+   if (state.isStrictModeEnabled) {
+      // STRICT MODE: Clean Removal
+      // Use display: none !important to force removal from flow.
+      card.style.setProperty("display", "none", "important");
+      card.style.setProperty("visibility", "hidden", "important"); // Double tap
+   } else {
+      // DEFAULT MODE: "Premium Blur" Overlay
+      // Instead of a grey box, we blur the content and show a minimal interactable overlay.
+
+      // 1. Blur the content
+      if (targetContainer) {
+         targetContainer.style.filter = "blur(12px) grayscale(100%) opacity(0.4)";
+         targetContainer.style.pointerEvents = "none"; // Prevent clicks on blurred video
+         targetContainer.style.transition = "all 0.4s ease";
+      }
+
+      // 2. Add the minimalist overlay
+      const overlay = document.createElement("div");
+      overlay.className = "yqs-filter-overlay";
+
+      // Centered overlay styling
+      Object.assign(overlay.style, {
+         position: "absolute",
+         top: "0",
+         left: "0",
+         right: "0",
+         bottom: "0",
+         zIndex: "10",
+         display: "flex",
+         flexDirection: "column",
+         alignItems: "center",
+         justifyContent: "center",
+         pointerEvents: "auto", // Allow clicking the button
+      });
+
+      overlay.innerHTML = `
+            <div style="
+                background: rgba(0,0,0,0.8); 
+                backdrop-filter: blur(8px);
+                border-radius: 12px; 
+                padding: 12px 20px;
+                display:flex; flex-direction:column; align-items:center; justify-content:center;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+                border: 1px solid rgba(255,255,255,0.1);
+            ">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="#aaa">
+                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                    </svg>
+                    <span style="color:#eee; font-family:sans-serif; font-size:13px; font-weight:500;">Filtered</span>
+                </div>
+                <button class="yqs-reveal-btn" style="
+                    background: rgba(62, 166, 255, 0.2); 
+                    border: 1px solid rgba(62, 166, 255, 0.4); 
+                    color: #fff; 
+                    padding: 8px 16px; 
+                    border-radius: 20px; 
+                    cursor: pointer; 
+                    font-size: 12px;
+                    font-weight: 600;
+                    transition: all 0.2s;
+                ">Show Video</button>
+            </div>
+        `;
+
+      // Hover Effect for Button
+      const btn = overlay.querySelector(".yqs-reveal-btn");
+      if (btn) {
+         btn.onmouseover = () => {
+            btn.style.background = "rgba(62, 166, 255, 0.4)";
+            btn.style.borderColor = "#3ea6ff";
+         };
+         btn.onmouseout = () => {
+            btn.style.background = "rgba(62, 166, 255, 0.2)";
+            btn.style.borderColor = "rgba(62, 166, 255, 0.4)";
+         };
+
+         btn.onclick = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+
+            // Reveal Animation
+            overlay.style.opacity = "0";
+            overlay.style.pointerEvents = "none";
+            if (targetContainer) {
+               targetContainer.style.filter = "none";
+               targetContainer.style.pointerEvents = "auto";
+               targetContainer.style.opacity = "1";
+            }
+            // Remove after animation
+            setTimeout(() => overlay.remove(), 400);
+         };
+      }
+
+      // Ensure Card Positioning
+      const computedPos = window.getComputedStyle(card).position;
+      if (computedPos === "static") card.style.position = "relative";
+      card.appendChild(overlay);
+   }
+};
+
+// ---------------------------------------------------------
 // OPTIMIZED OBSERVERS & PASSIVE LISTENERS
 // ---------------------------------------------------------
 const initObservers = () => {
@@ -645,6 +932,18 @@ const initObservers = () => {
       });
       playerObserver.observe(player, { attributes: true, attributeFilter: ["class"] });
    }
+
+   // 3. Grid/Feed Observer for Focus Filter
+   // Observe the main content container to detect new video loads (infinite scroll)
+   // ytd-app combines almost everything. 'content' is usually the main wrapper.
+   const contentApp = document.querySelector("ytd-app") || document.body;
+   const contentObserver = new MutationObserver((mutations) => {
+      // Throttle slightly
+      if (state.isFocusModeEnabled) {
+         runFocusFilter();
+      }
+   });
+   contentObserver.observe(contentApp, { childList: true, subtree: true });
 };
 
 // Start Observers
@@ -653,6 +952,7 @@ initObservers();
 setInterval(() => {
    const video = getVideo();
    handlePopups();
+   if (state.isFocusModeEnabled) runFocusFilter();
 
    // Failsafe: Always try to skip if enabled, even if detection missed it
    if (state.isAutoSkipEnabled) skipAd();
@@ -751,6 +1051,98 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
          state.loop.end = null;
          sendResponse({ success: true, loop: state.loop });
          break;
+
+      // KEYWORD HANDLERS
+      case "TOGGLE_FOCUS_MODE":
+         state.isFocusModeEnabled = request.enabled;
+         if (state.isFocusModeEnabled) {
+            runFocusFilter();
+         } else {
+            // Optional: Un-hide everything? A reload is cleaner, but we can try to unhide.
+            // For now, reload is easiest for "Show All" or just future items won't be blocked.
+            location.reload();
+         }
+         needSave = true;
+         sendResponse({ success: true });
+         break;
+      case "TOGGLE_STRICT_MODE":
+         state.isStrictModeEnabled = request.enabled;
+         // Rerun filter to update styles
+         document.querySelectorAll("[data-yqs-filtered='true']").forEach((el) => {
+            // Reset state and re-process
+            el.style.visibility = "";
+            const blocker = el.querySelector(".yqs-content-blocker");
+            if (blocker) blocker.remove();
+            delete el.dataset.yqsFiltered;
+         });
+         runFocusFilter();
+         needSave = true;
+         sendResponse({ success: true });
+         break;
+      case "ADD_KEYWORD":
+         if (request.word && !state.focusKeywords.includes(request.word)) {
+            state.focusKeywords.push(request.word);
+            runFocusFilter();
+            needSave = true;
+         }
+         sendResponse({ success: true, keywords: state.focusKeywords });
+         break;
+      case "REMOVE_KEYWORD":
+         state.focusKeywords = state.focusKeywords.filter((k) => k !== request.word);
+         // Rerun logic might be creating false negatives if we don't un-hide.
+         // Simpler to reload or just let the user know changes apply on new content/reload.
+         // Actually, let's just save.
+         needSave = true;
+         sendResponse({ success: true, keywords: state.focusKeywords });
+         break;
+
+      case "TOGGLE_CATEGORY":
+         if (request.category) {
+            if (request.enabled) {
+               if (!state.activeCategories.includes(request.category)) {
+                  state.activeCategories.push(request.category);
+               }
+            } else {
+               state.activeCategories = state.activeCategories.filter((c) => c !== request.category);
+            }
+            runFocusFilter();
+            needSave = true;
+         }
+         sendResponse({ success: true, activeCategories: state.activeCategories });
+         break;
+
+      case "ADD_CATEGORY":
+         if (request.category && request.category.id) {
+            const exists = state.customCategories.find((c) => c.id === request.category.id);
+            if (!exists) {
+               state.customCategories.push(request.category);
+               needSave = true;
+            }
+         }
+         sendResponse({ success: true, customCategories: state.customCategories });
+         break;
+
+      case "DELETE_CATEGORY":
+         if (request.id) {
+            state.customCategories = state.customCategories.filter((c) => c.id !== request.id);
+            // Also remove from active
+            state.activeCategories = state.activeCategories.filter((c) => c !== request.id);
+            needSave = true;
+         }
+         sendResponse({ success: true, customCategories: state.customCategories });
+         break;
+
+      case "TOGGLE_MIRROR":
+         toggleMirror(request.enabled);
+         needSave = true;
+         sendResponse({ success: true, isMirrored: state.isMirrored });
+         break;
+
+      case "TAKE_SNAPSHOT":
+         takeSnapshot();
+         sendResponse({ success: true });
+         break;
+
       case "GET_STATE":
          let currentSpeed = state.targetSpeed;
          if (video) {
@@ -766,7 +1158,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             booster: state.isBoosterEnabled,
             boostSpeed: state.boostSpeed,
             volume: state.volume,
-            loop: state.loop,
+            isMirrored: state.isMirrored,
+            // Focus Response
+            focusMode: state.isFocusModeEnabled,
+            strictMode: state.isStrictModeEnabled,
+            keywords: state.focusKeywords,
+            activeCategories: state.activeCategories,
+            customCategories: state.customCategories,
+
             currentTime: video ? video.currentTime : 0,
          });
          break;
@@ -775,4 +1174,4 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
    return true;
 });
 
-console.log("[SpeedController] Loaded (v9.3 - Performance OK)");
+console.log("[SpeedController] Loaded (v9.3 - Focus Filter Enabled)");

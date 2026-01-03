@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
       boostSpeedSlider: document.getElementById("boostSpeedSlider"),
       boostSpeedValue: document.getElementById("boostSpeedValue"),
 
+      // Tools
       volSlider: document.getElementById("vol-slider"),
       volValue: document.getElementById("vol-value"),
       loopA: document.getElementById("btn-loop-a"),
@@ -22,6 +23,24 @@ document.addEventListener("DOMContentLoaded", () => {
       loopStatus: document.getElementById("loop-status"),
       timeA: document.getElementById("time-a"),
       timeB: document.getElementById("time-b"),
+      screenshotBtn: document.getElementById("btn-screenshot"),
+
+      // FOCUS FILTER
+      focusToggle: document.getElementById("focus-filter-toggle"),
+      strictModeToggle: document.getElementById("strict-mode-toggle"),
+      keywordInput: document.getElementById("keyword-input"),
+      addKeywordBtn: document.getElementById("add-keyword-btn"),
+      keywordsList: document.getElementById("keywords-list"),
+
+      // Category Modal Elements
+      createCatBtn: document.getElementById("create-category-btn"),
+      categoryModal: document.getElementById("category-modal"),
+      closeModalBtn: document.getElementById("close-modal-btn"),
+      saveCatBtn: document.getElementById("save-category-btn"),
+      newCatName: document.getElementById("new-cat-name"),
+      newCatKeywords: document.getElementById("new-cat-keywords"),
+      iconPicker: document.getElementById("icon-picker"),
+      categoryGrid: document.querySelector(".category-grid"),
    };
 
    // Nav Items
@@ -30,6 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
       "view-speed": document.getElementById("view-speed"),
       "view-tools": document.getElementById("view-tools"),
       "view-settings": document.getElementById("view-settings"),
+      "view-focus": document.getElementById("view-focus"),
    };
 
    // Helper: Switch Tabs
@@ -82,6 +102,40 @@ document.addEventListener("DOMContentLoaded", () => {
       return null;
    }
 
+   // Render Keywords List
+   function renderKeywordsList(keywords) {
+      elements.keywordsList.innerHTML = "";
+      if (!keywords || keywords.length === 0) {
+         elements.keywordsList.innerHTML = '<div class="empty-state">No keywords added</div>';
+         return;
+      }
+
+      keywords.forEach((word) => {
+         const div = document.createElement("div");
+         div.className = "keyword-tag";
+         div.innerHTML = `
+            <span>${word}</span>
+            <button class="delete-tag-btn" data-word="${word}">
+               <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+               </svg>
+            </button>
+         `;
+         elements.keywordsList.appendChild(div);
+      });
+
+      // Bind delete events
+      document.querySelectorAll(".delete-tag-btn").forEach((btn) => {
+         btn.addEventListener("click", async () => {
+            const wordToRemove = btn.dataset.word;
+            await sendMessage({ action: "REMOVE_KEYWORD", word: wordToRemove });
+            // Optimistic update
+            const newKeywords = keywords.filter((k) => k !== wordToRemove);
+            renderKeywordsList(newKeywords);
+         });
+      });
+   }
+
    // Update UI
    function updateUI(state) {
       if (!state) return;
@@ -100,6 +154,30 @@ document.addEventListener("DOMContentLoaded", () => {
       if (state.speedAds !== undefined && elements.speedAdsToggle) elements.speedAdsToggle.checked = state.speedAds;
       if (state.zenMode !== undefined && elements.zenModeToggle) elements.zenModeToggle.checked = state.zenMode;
       if (state.booster !== undefined && elements.boosterToggle) elements.boosterToggle.checked = state.booster;
+
+      // Focus Settings
+      if (state.focusMode !== undefined && elements.focusToggle) elements.focusToggle.checked = state.focusMode;
+      if (state.strictMode !== undefined && elements.strictModeToggle) elements.strictModeToggle.checked = state.strictMode;
+      if (state.keywords !== undefined) renderKeywordsList(state.keywords);
+
+      if (state.activeCategories) {
+         // Render Custom Categories first if not already there
+         if (state.customCategories) {
+            renderCustomCategories(state.customCategories);
+         }
+
+         document.querySelectorAll(".category-btn").forEach((btn) => {
+            // Skip the "Create" button
+            if (btn.id === "create-category-btn") return;
+
+            const cat = btn.dataset.category;
+            if (state.activeCategories.includes(cat)) {
+               btn.classList.add("active");
+            } else {
+               btn.classList.remove("active");
+            }
+         });
+      }
 
       // Boost Settings (New)
       if (state.boostKey && elements.boostKeySelect) elements.boostKeySelect.value = state.boostKey;
@@ -176,6 +254,123 @@ document.addEventListener("DOMContentLoaded", () => {
       });
    }
 
+   // --- Helper for Custom Categories ---
+   function renderCustomCategories(customCats) {
+      // Remove existing custom buttons to prevent duplicates
+      // We identify them by a special class or attribute, but simply checking ID helps
+
+      // Strategy: Only append if not exists
+      customCats.forEach((cat) => {
+         if (!document.querySelector(`.category-btn[data-category="${cat.id}"]`)) {
+            // Insert before the "Create" button
+            const btn = document.createElement("button");
+            btn.className = "category-btn custom-cat-btn"; // Add custom class
+            btn.dataset.category = cat.id;
+            btn.innerHTML = `<span>${cat.icon || "📁"}</span> ${cat.name}`;
+
+            // Add click listener immediately
+            btn.addEventListener("click", async () => {
+               btn.classList.toggle("active");
+               const isActive = btn.classList.contains("active");
+               await sendMessage({
+                  action: "TOGGLE_CATEGORY",
+                  category: cat.id,
+                  enabled: isActive,
+               });
+            });
+
+            // Add Right Click to Delete
+            btn.addEventListener("contextmenu", async (e) => {
+               e.preventDefault();
+               if (confirm(`Delete category "${cat.name}"?`)) {
+                  await sendMessage({ action: "DELETE_CATEGORY", id: cat.id });
+                  btn.remove();
+               }
+            });
+
+            if (elements.createCatBtn && elements.categoryGrid) {
+               elements.categoryGrid.insertBefore(btn, elements.createCatBtn);
+            }
+         }
+      });
+   }
+
+   // Modal Logic
+   if (elements.createCatBtn) {
+      elements.createCatBtn.addEventListener("click", () => {
+         elements.categoryModal.style.display = "flex";
+         elements.newCatName.focus();
+      });
+   }
+
+   if (elements.closeModalBtn) {
+      elements.closeModalBtn.addEventListener("click", () => {
+         elements.categoryModal.style.display = "none";
+      });
+   }
+
+   // Close on outside click
+   if (elements.categoryModal) {
+      elements.categoryModal.addEventListener("click", (e) => {
+         if (e.target === elements.categoryModal) {
+            elements.categoryModal.style.display = "none";
+         }
+      });
+   }
+
+   // Icon Picker Logic
+   // Icon Picker Logic
+   // Default to Folder SVG
+   let selectedIcon =
+      '<svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>';
+
+   if (elements.iconPicker) {
+      elements.iconPicker.querySelectorAll(".picker-item").forEach((item) => {
+         item.addEventListener("click", () => {
+            elements.iconPicker.querySelectorAll(".picker-item").forEach((i) => i.classList.remove("selected"));
+            item.classList.add("selected");
+            // Set SVG string from data attribute
+            selectedIcon = item.dataset.icon;
+         });
+      });
+   }
+
+   // Save Category
+   if (elements.saveCatBtn) {
+      elements.saveCatBtn.addEventListener("click", async () => {
+         const name = elements.newCatName.value.trim();
+         const keywordsRaw = elements.newCatKeywords.value.trim();
+
+         if (!name) {
+            alert("Please enter a category name");
+            return;
+         }
+         if (!keywordsRaw) {
+            alert("Please add at least one keyword");
+            return;
+         }
+
+         const keywords = keywordsRaw
+            .split(",")
+            .map((k) => k.trim())
+            .filter((k) => k);
+         const id = "custom_" + Date.now();
+
+         const newCat = { id, name, keywords, icon: selectedIcon };
+
+         // Send to content script
+         const res = await sendMessage({ action: "ADD_CATEGORY", category: newCat });
+
+         if (res && res.success) {
+            // UI Update
+            renderCustomCategories([newCat]);
+            elements.categoryModal.style.display = "none";
+            elements.newCatName.value = "";
+            elements.newCatKeywords.value = "";
+         }
+      });
+   }
+
    if (elements.speedAdsToggle) {
       elements.speedAdsToggle.addEventListener("change", async (e) => {
          await sendMessage({ action: "TOGGLE_SPEED_ADS", enabled: e.target.checked });
@@ -191,6 +386,78 @@ document.addEventListener("DOMContentLoaded", () => {
    if (elements.boosterToggle) {
       elements.boosterToggle.addEventListener("change", async (e) => {
          await sendMessage({ action: "TOGGLE_BOOSTER", enabled: e.target.checked });
+      });
+   }
+
+   // Focus Mode Listeners
+   if (elements.focusToggle) {
+      elements.focusToggle.addEventListener("change", async (e) => {
+         await sendMessage({ action: "TOGGLE_FOCUS_MODE", enabled: e.target.checked });
+      });
+   }
+
+   if (elements.strictModeToggle) {
+      elements.strictModeToggle.addEventListener("change", async (e) => {
+         await sendMessage({ action: "TOGGLE_STRICT_MODE", enabled: e.target.checked });
+      });
+   }
+
+   if (elements.addKeywordBtn && elements.keywordInput) {
+      elements.addKeywordBtn.addEventListener("click", async () => {
+         const word = elements.keywordInput.value.trim();
+         if (word) {
+            const res = await sendMessage({ action: "ADD_KEYWORD", word });
+            if (res && res.keywords) {
+               renderKeywordsList(res.keywords);
+               elements.keywordInput.value = "";
+            }
+         }
+      });
+
+      elements.keywordInput.addEventListener("keydown", async (e) => {
+         if (e.key === "Enter") {
+            const word = elements.keywordInput.value.trim();
+            if (word) {
+               const res = await sendMessage({ action: "ADD_KEYWORD", word });
+               if (res && res.keywords) {
+                  renderKeywordsList(res.keywords);
+                  elements.keywordInput.value = "";
+               }
+            }
+         }
+      });
+   }
+
+   // Category Button Listeners
+   document.querySelectorAll(".category-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+         const category = btn.dataset.category;
+         const isActive = btn.classList.contains("active");
+
+         // Toggle visual state immediately for responsiveness
+         btn.classList.toggle("active");
+
+         await sendMessage({
+            action: "TOGGLE_CATEGORY",
+            category: category,
+            enabled: !isActive,
+         });
+      });
+   });
+
+   // Video Utility Listeners
+   if (elements.screenshotBtn) {
+      elements.screenshotBtn.addEventListener("click", () => {
+         sendMessage({ action: "TAKE_SNAPSHOT" });
+         window.close(); // Close popup to see notification/download
+      });
+   }
+
+   if (elements.mirrorBtn) {
+      elements.mirrorBtn.addEventListener("click", async () => {
+         elements.mirrorBtn.classList.toggle("active");
+         const isMirrored = elements.mirrorBtn.classList.contains("active");
+         await sendMessage({ action: "TOGGLE_MIRROR", enabled: isMirrored });
       });
    }
 
