@@ -1,238 +1,557 @@
-// Helper to find the video element
-const getVideo = () => document.querySelector("video");
+// ============================================================================
+// UNIVERSAL AD BLOCKER - Phase 1
+// ============================================================================
 
-// State
-let state = {
-   targetSpeed: 1.0,
-   isAutoSkipEnabled: true,
-   isSpeedAdEnabled: true,
-   isZenModeEnabled: false,
-   isBoosterEnabled: true,
-   volume: 1.0,
-   loop: { active: false, start: null, end: null },
+// Import utilities (Note: Chrome extensions don't support ES6 imports in content scripts yet)
+// We'll use inline code for now, can refactor to modules later
 
-   // Boost Settings (Configurable)
-   boostKey: "Shift",
-   boostSpeed: 2.5,
+// Site Detection
+const detectCurrentSite = () => {
+   const hostname = window.location.hostname;
+   const hasVideo = !!document.querySelector("video");
 
-   // Focus Filter State
-   isFocusModeEnabled: false, // Default: OFF
-   isStrictModeEnabled: false,
-   focusKeywords: [], // Array of lowercase strings
-   activeCategories: [], // Array of active category IDs (e.g. ['food', 'tech'])
-   customCategories: [], // Array of { id, name, keywords[], icon }
-   isMirrored: false,
-
-   // Internal state
-   originalSpeed: 1.0,
-   originalMuted: false,
-   isAdSpeeding: false,
-   adSkipClicked: false,
-   isKeyBoosting: false,
-};
-
-// CATEGORY DEFINITIONS
-const PRESET_CATEGORIES = {
-   food: ["food", "cooking", "recipe", "kitchen", "chef", "meal", "eating", "mukbang", "taste test", "street food", "restaurant"],
-   tech: [
-      "tech",
-      "technology",
-      "gadget",
-      "smartphone",
-      "iphone",
-      "android",
-      "review",
-      "unboxing",
-      "software",
-      "coding",
-      "programming",
-      "computer",
-      "pc build",
-   ],
-   ai: [
-      "ai",
-      "artificial intelligence",
-      "chatgpt",
-      "midjourney",
-      "llm",
-      "openai",
-      "machine learning",
-      "robot",
-      "automation",
-      "future tech",
-   ],
-   spiritual: [
-      "spiritual",
-      "meditation",
-      "yoga",
-      "chakra",
-      "manifestation",
-      "astrology",
-      "tarot",
-      "psychic",
-      "healing",
-      "guru",
-      "awakening",
-   ],
-   gaming: [
-      "gaming",
-      "gameplay",
-      "walkthrough",
-      "streamer",
-      "twitch",
-      "esports",
-      "minecraft",
-      "roblox",
-      "fortnite",
-      "playstation",
-      "xbox",
-      "nintendo",
-   ],
-   shorts: ["#shorts", "shorts"], // Special handling might be needed for actual shorts shelf, but keywords help too
-};
-
-let cachedIsAdPlaying = false;
-let fundingChoicesHandled = false;
-
-// ---------------------------------------------------------
-// UI OVERLAYS (Visual Feedback)
-// ---------------------------------------------------------
-const createBoostOverlay = () => {
-   if (document.getElementById("yqs-boost-overlay")) return;
-
-   const overlay = document.createElement("div");
-   overlay.id = "yqs-boost-overlay";
-   // Sleek minimal design
-   overlay.innerHTML = `<span style="font-size:20px; margin-right:6px">⚡</span> <span id="yqs-boost-text" style="font-family:'Roboto','Segoe UI',sans-serif; font-weight:700; font-size:18px;">2.5x</span>`;
-
-   Object.assign(overlay.style, {
-      position: "fixed",
-      top: "12%",
-      left: "50%",
-      transform: "translateX(-50%) scale(0.8)",
-
-      // Glassmorphism
-      backgroundColor: "rgba(20, 20, 30, 0.75)",
-      backdropFilter: "blur(12px)",
-      webkitBackdropFilter: "blur(12px)",
-
-      color: "#fff",
-      padding: "8px 20px",
-      borderRadius: "99px",
-      zIndex: "2147483647",
-      pointerEvents: "none",
-
-      boxShadow: "0 8px 32px rgba(0,0,0,0.3), 0 1px 1px rgba(255,255,255,0.1) inset",
-      opacity: "0",
-      transition: "all 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28)", // Bouncy pop
-
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      minWidth: "80px",
-   });
-
-   document.body.appendChild(overlay);
-};
-
-const showBoostOverlay = () => {
-   const el = document.getElementById("yqs-boost-overlay");
-   if (!el) createBoostOverlay();
-
-   const overlay = document.getElementById("yqs-boost-overlay");
-   const textSpan = document.getElementById("yqs-boost-text");
-
-   if (overlay) {
-      if (textSpan) textSpan.textContent = `${state.boostSpeed}x`;
-
-      overlay.style.opacity = "1";
-      overlay.style.transform = "translateX(-50%) scale(1)";
-      overlay.style.top = "12%";
+   // Check if YouTube (special handling for YouTube-specific features)
+   if (hostname.includes("youtube.com") || hostname.includes("youtu.be")) {
+      return { type: "youtube", hasVideo: true, hostname };
    }
-};
 
-const hideBoostOverlay = () => {
-   const overlay = document.getElementById("yqs-boost-overlay");
-   if (overlay) {
-      overlay.style.opacity = "0";
-      overlay.style.transform = "translateX(-50%) scale(0.8)";
-   }
-};
-
-// ---------------------------------------------------------
-// STORAGE & PERSISTENCE
-// ---------------------------------------------------------
-const STORAGE_KEY = "yt_quick_speed_settings";
-
-const saveSettings = () => {
-   const settings = {
-      targetSpeed: state.targetSpeed,
-      isAutoSkipEnabled: state.isAutoSkipEnabled,
-      isSpeedAdEnabled: state.isSpeedAdEnabled,
-      isZenModeEnabled: state.isZenModeEnabled,
-      isBoosterEnabled: state.isBoosterEnabled,
-      volume: state.volume,
-      // Focus Persistence
-      isFocusModeEnabled: state.isFocusModeEnabled,
-      isStrictModeEnabled: state.isStrictModeEnabled,
-      focusKeywords: state.focusKeywords,
-      activeCategories: state.activeCategories,
-      customCategories: state.customCategories,
-      isMirrored: state.isMirrored,
+   // All other sites get universal ad blocking
+   return {
+      type: "generic",
+      hasVideo,
+      hostname,
    };
-   chrome.storage.local.set({ [STORAGE_KEY]: settings });
 };
 
-const loadSettings = () => {
-   chrome.storage.local.get([STORAGE_KEY], (result) => {
-      if (result[STORAGE_KEY]) {
-         const saved = result[STORAGE_KEY];
-         if (saved.targetSpeed) state.targetSpeed = saved.targetSpeed;
-         if (saved.isAutoSkipEnabled !== undefined) state.isAutoSkipEnabled = saved.isAutoSkipEnabled;
-         if (saved.isSpeedAdEnabled !== undefined) state.isSpeedAdEnabled = saved.isSpeedAdEnabled;
-         if (saved.isBoosterEnabled !== undefined) state.isBoosterEnabled = saved.isBoosterEnabled;
+// Universal Element Hiding - COMPREHENSIVE
+const hideUniversalAds = (removeCompletely = true) => {
+   const selectors = [
+      // Generic ad containers
+      '[class*="ad-container"]',
+      '[class*="ad-wrapper"]',
+      '[class*="ad-banner"]',
+      '[class*="advertisement"]',
+      '[class*="advert"]',
+      '[id*="ad-container"]',
+      '[id*="ad-wrapper"]',
+      '[id*="google_ads"]',
+      '[id*="google-ads"]',
+      '[id*="ad-slot"]',
+      '[id*="adslot"]',
 
-         // Load Focus
-         if (saved.isFocusModeEnabled !== undefined) state.isFocusModeEnabled = saved.isFocusModeEnabled;
-         if (saved.isStrictModeEnabled !== undefined) state.isStrictModeEnabled = saved.isStrictModeEnabled;
-         if (saved.focusKeywords !== undefined) state.focusKeywords = saved.focusKeywords;
-         if (saved.activeCategories !== undefined) state.activeCategories = saved.activeCategories;
-         if (saved.customCategories !== undefined) state.customCategories = saved.customCategories;
+      // Common ad classes
+      ".ad",
+      ".ads",
+      ".advert",
+      ".advertisement",
+      ".sponsored",
+      ".sponsor",
+      ".ad-banner",
+      ".ad-box",
+      ".ad-frame",
+      ".ad-space",
+      ".banner-ad",
+      ".text-ad",
 
-         if (saved.volume !== undefined) {
-            state.volume = saved.volume;
-            setVolume(state.volume);
-         }
+      // BuzzFeed specific (obfuscated classes)
+      '[class*="img_ybfqurd"]',
+      '[data-module="ad-"]',
+      '[data-module*="ad"]',
+      '[role="complementary"][aria-label="Advertisement"]',
 
-         // Visual settings
-         if (saved.isZenModeEnabled !== undefined) {
-            state.isZenModeEnabled = saved.isZenModeEnabled;
-            toggleZenMode(state.isZenModeEnabled);
-         }
+      // Ad iframes
+      'iframe[src*="doubleclick"]',
+      'iframe[src*="googlesyndication"]',
+      'iframe[src*="advertising"]',
+      'iframe[src*="adservice"]',
+      'iframe[src*="/ads/"]',
+      'iframe[id*="google_ads"]',
+      'iframe[title*="3rd party ad"]',
+      'iframe[title*="Advertisement"]',
 
-         if (saved.isMirrored !== undefined) {
-            state.isMirrored = saved.isMirrored;
-            toggleMirror(state.isMirrored);
-         }
+      // Standard ad sizes
+      '[width="728"][height="90"]',
+      '[width="300"][height="250"]',
+      '[width="160"][height="600"]',
+      '[width="300"][height="600"]',
+      '[width="970"][height="90"]',
+      '[width="320"][height="50"]',
+      '[width="468"][height="60"]',
 
-         // Trigger filter on load
-         if (state.isFocusModeEnabled) runFocusFilter();
-      }
+      // Data attributes
+      "[data-ad]",
+      "[data-ad-slot]",
+      "[data-ad-unit]",
+      "[data-google-query-id]",
+      "[data-google-container-id]",
+      "[data-ad-client]",
+
+      // Image ads (GIF, PNG, JPG)
+      'img[src*="/ad"]',
+      'img[src*="/ads/"]',
+      'img[src*="banner"]',
+      'img[src*="advert"]',
+      'img[src*="_ad."]',
+      'img[src*="-ad."]',
+      'img[src*="/ad."]',
+      'img[src*="/ads."]',
+      'img[alt*="advertisement"]',
+      'img[alt*="sponsor"]',
+
+      // AdBlock Tester specific
+      'img[src*="d31qbv1cthcecs.cloudfront.net"]',
+      'img[src*="pagead2.googlesyndication.com"]',
+      '[class*="adsbygoogle"]',
+      "ins.adsbygoogle",
+      ".ad-unit",
+      ".ad-block",
+      ".ad-content",
+
+      // Flash/SWF ads
+      'object[data*=".swf"]',
+      'object[data*="/ad"]',
+      'object[data*="banner"]',
+      'embed[src*=".swf"]',
+      'embed[src*="/ad"]',
+      'embed[src*="banner"]',
+      'object[type="application/x-shockwave-flash"]',
+      'embed[type="application/x-shockwave-flash"]',
+      'object[classid*="D27CDB6E-AE6D-11cf-96B8-444553540000"]',
+
+      // Video ads
+      "lima-video",
+      '[class*="video-ad"]',
+
+      // Tracking pixels
+      'img[width="1"][height="1"]',
+      'img[src*="/pixel"]',
+      'img[src*="tracking"]',
+
+      // Universal popup & overlay patterns
+      'iframe[title*="ad" i]', // Iframes with "ad" in title
+      'iframe[title*="offer" i]', // Offer iframes
+      'iframe[title*="popup" i]', // Popup iframes
+      'iframe[src*="/ad/"]', // Ad path iframes
+      'iframe[src*="/ads/"]', // Ads path iframes
+      'iframe[src*="popunder"]', // Popunder iframes
+      'iframe[src*="popup"]', // Popup iframes
+
+      // Generic popup containers
+      '[id*="popup" i]:not(#page):not(#content)', // Popup IDs
+      '[class*="popup" i][class*="ad" i]', // Popup + ad classes
+      '[class*="overlay" i][class*="ad" i]', // Overlay + ad classes
+      '[class*="modal" i][class*="ad" i]', // Modal + ad classes
+      '[id*="modal" i][id*="ad" i]', // Modal + ad IDs
+   ];
+
+   let hiddenCount = 0;
+   selectors.forEach((selector) => {
+      try {
+         document.querySelectorAll(selector).forEach((el) => {
+            // Don't remove if already marked or if it's inside a video player
+            if (!el.dataset.uabHidden && !el.closest("video")) {
+               if (removeCompletely) {
+                  el.remove(); // COMPLETELY REMOVE from DOM
+               } else {
+                  // Aggressive hiding - make absolutely invisible
+                  el.style.setProperty("display", "none", "important");
+                  el.style.setProperty("visibility", "hidden", "important");
+                  el.style.setProperty("opacity", "0", "important");
+                  el.style.setProperty("height", "0px", "important");
+                  el.style.setProperty("width", "0px", "important");
+                  el.style.setProperty("max-height", "0px", "important");
+                  el.style.setProperty("max-width", "0px", "important");
+                  el.style.setProperty("overflow", "hidden", "important");
+                  el.style.setProperty("position", "absolute", "important");
+                  el.style.setProperty("left", "-9999px", "important");
+                  el.style.setProperty("top", "-9999px", "important");
+               }
+               el.dataset.uabHidden = "true";
+               hiddenCount++;
+            }
+         });
+      } catch (e) {}
    });
+
+   return hiddenCount;
 };
 
-// ---------------------------------------------------------
-// ZEN MODE LOGIC
-// ---------------------------------------------------------
-const updateZenStyle = (enabled) => {
-   const styleId = "yqs-zen-mode-style";
-   let style = document.getElementById(styleId);
+// Check if site is whitelisted
+const checkWhitelist = async () => {
+   try {
+      const response = await chrome.runtime.sendMessage({
+         action: "IS_WHITELISTED",
+         url: window.location.href,
+      });
+      return response?.isWhitelisted || false;
+   } catch (e) {
+      return false;
+   }
+};
 
-   if (enabled) {
-      if (!style) {
-         style = document.createElement("style");
-         style.id = styleId;
-         style.textContent = `
+// Block popups and redirects
+const blockPopupsAndRedirects = () => {
+   // Block window.open (popups)
+   const originalOpen = window.open;
+   window.open = function (...args) {
+      console.log("[Universal Ad Blocker] Blocked popup attempt:", args[0]);
+      return null;
+   };
+
+   // Block pop-unders (new window opening)
+   window.addEventListener(
+      "click",
+      (e) => {
+         // If a new window tries to open on click, block it
+         const target = e.target.closest("a");
+         if (target && target.target === "_blank") {
+            const url = target.href;
+            // Allow legitimate links, block suspicious ones
+            if (
+               url &&
+               (url.includes("popup") ||
+                  url.includes("redirect") ||
+                  url.includes("track") ||
+                  url.includes("click") ||
+                  url.match(/^https?:\/\/[^\/]+\/?$/)) // Bare domain redirects
+            ) {
+               e.preventDefault();
+               e.stopPropagation();
+               console.log("[Universal Ad Blocker] Blocked redirect:", url);
+               return false;
+            }
+         }
+      },
+      true,
+   );
+
+   // Block beforeunload popups
+   window.addEventListener(
+      "beforeunload",
+      (e) => {
+         delete e.returnValue;
+      },
+      true,
+   );
+
+   console.log("[Universal Ad Blocker] Popup & redirect blocking active");
+};
+
+// Initialize Universal Ad Blocking
+const currentSite = detectCurrentSite();
+console.log(`[Universal Ad Blocker] Detected site: ${currentSite.type} (${currentSite.hostname})`);
+
+// Skip ad blocking on chrome:// and about: pages (New Tab, Settings, etc.)
+const isInternalPage =
+   window.location.protocol === "chrome:" || window.location.protocol === "about:" || window.location.protocol === "chrome-extension:";
+
+if (isInternalPage) {
+   console.log("[Universal Ad Blocker] Skipping internal browser page");
+} else if (currentSite.type !== "youtube") {
+   // Activate popup & redirect blocking immediately
+   blockPopupsAndRedirects();
+
+   // Check whitelist first
+   checkWhitelist().then((isWhitelisted) => {
+      if (isWhitelisted) {
+         console.log("[Universal Ad Blocker] Site is whitelisted, ad blocking disabled");
+         return;
+      }
+
+      // For non-YouTube sites, run universal ad blocking
+      const initialHidden = hideUniversalAds(true); // TRUE = remove completely
+      if (initialHidden > 0) {
+         console.log(`[Universal Ad Blocker] Removed ${initialHidden} ad elements`);
+         chrome.runtime
+            .sendMessage({
+               action: "INCREMENT_STATS",
+               domain: currentSite.hostname,
+               type: "element",
+            })
+            .catch(() => {});
+      }
+
+      // Watch for new ads with MutationObserver
+      const observer = new MutationObserver(() => {
+         const newHidden = hideUniversalAds(true); // TRUE = remove completely
+         if (newHidden > 0) {
+            console.log(`[Universal Ad Blocker] Removed ${newHidden} dynamically loaded ads`);
+            chrome.runtime
+               .sendMessage({
+                  action: "INCREMENT_STATS",
+                  domain: currentSite.hostname,
+                  type: "element",
+               })
+               .catch(() => {});
+         }
+      });
+
+      if (document.body) {
+         observer.observe(document.body, { childList: true, subtree: true });
+      } else {
+         document.addEventListener("DOMContentLoaded", () => {
+            observer.observe(document.body, { childList: true, subtree: true });
+         });
+      }
+
+      // CONTINUOUS SCANNING - Run every 2 seconds to catch delayed ads
+      setInterval(() => {
+         const scannedHidden = hideUniversalAds(true);
+         if (scannedHidden > 0) {
+            console.log(`[Universal Ad Blocker] Continuous scan removed ${scannedHidden} ads`);
+            chrome.runtime
+               .sendMessage({
+                  action: "INCREMENT_STATS",
+                  domain: currentSite.hostname,
+                  type: "element",
+               })
+               .catch(() => {});
+         }
+      }, 2000); // Scan every 2 seconds
+   });
+}
+
+// ============================================================================
+// YOUTUBE-SPECIFIC CODE (Existing functionality preserved)
+// ============================================================================
+
+// Only run YouTube-specific features on YouTube
+if (currentSite.type === "youtube") {
+   // Helper to find the video element
+   const getVideo = () => document.querySelector("video");
+
+   // State
+   let state = {
+      targetSpeed: 1.0,
+      isAutoSkipEnabled: true,
+      isSpeedAdEnabled: true,
+      isZenModeEnabled: false,
+      isBoosterEnabled: true,
+      volume: 1.0,
+      loop: { active: false, start: null, end: null },
+
+      // Boost Settings (Configurable)
+      boostKey: "Shift",
+      boostSpeed: 2.5,
+
+      // Focus Filter State
+      isFocusModeEnabled: false, // Default: OFF
+      isStrictModeEnabled: false,
+      focusKeywords: [], // Array of lowercase strings
+      activeCategories: [], // Array of active category IDs (e.g. ['food', 'tech'])
+      customCategories: [], // Array of { id, name, keywords[], icon }
+      isMirrored: false,
+
+      // Internal state
+      originalSpeed: 1.0,
+      originalMuted: false,
+      isAdSpeeding: false,
+      adSkipClicked: false,
+      isKeyBoosting: false,
+   };
+
+   // CATEGORY DEFINITIONS
+   const PRESET_CATEGORIES = {
+      food: ["food", "cooking", "recipe", "kitchen", "chef", "meal", "eating", "mukbang", "taste test", "street food", "restaurant"],
+      tech: [
+         "tech",
+         "technology",
+         "gadget",
+         "smartphone",
+         "iphone",
+         "android",
+         "review",
+         "unboxing",
+         "software",
+         "coding",
+         "programming",
+         "computer",
+         "pc build",
+      ],
+      ai: [
+         "ai",
+         "artificial intelligence",
+         "chatgpt",
+         "midjourney",
+         "llm",
+         "openai",
+         "machine learning",
+         "robot",
+         "automation",
+         "future tech",
+      ],
+      spiritual: [
+         "spiritual",
+         "meditation",
+         "yoga",
+         "chakra",
+         "manifestation",
+         "astrology",
+         "tarot",
+         "psychic",
+         "healing",
+         "guru",
+         "awakening",
+      ],
+      gaming: [
+         "gaming",
+         "gameplay",
+         "walkthrough",
+         "streamer",
+         "twitch",
+         "esports",
+         "minecraft",
+         "roblox",
+         "fortnite",
+         "playstation",
+         "xbox",
+         "nintendo",
+      ],
+      shorts: ["#shorts", "shorts"], // Special handling might be needed for actual shorts shelf, but keywords help too
+   };
+
+   let cachedIsAdPlaying = false;
+   let fundingChoicesHandled = false;
+
+   // ---------------------------------------------------------
+   // UI OVERLAYS (Visual Feedback)
+   // ---------------------------------------------------------
+   const createBoostOverlay = () => {
+      if (document.getElementById("yqs-boost-overlay")) return;
+
+      const overlay = document.createElement("div");
+      overlay.id = "yqs-boost-overlay";
+      // Sleek minimal design
+      overlay.innerHTML = `<span style="font-size:20px; margin-right:6px">⚡</span> <span id="yqs-boost-text" style="font-family:'Roboto','Segoe UI',sans-serif; font-weight:700; font-size:18px;">2.5x</span>`;
+
+      Object.assign(overlay.style, {
+         position: "fixed",
+         top: "12%",
+         left: "50%",
+         transform: "translateX(-50%) scale(0.8)",
+
+         // Glassmorphism
+         backgroundColor: "rgba(20, 20, 30, 0.75)",
+         backdropFilter: "blur(12px)",
+         webkitBackdropFilter: "blur(12px)",
+
+         color: "#fff",
+         padding: "8px 20px",
+         borderRadius: "99px",
+         zIndex: "2147483647",
+         pointerEvents: "none",
+
+         boxShadow: "0 8px 32px rgba(0,0,0,0.3), 0 1px 1px rgba(255,255,255,0.1) inset",
+         opacity: "0",
+         transition: "all 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28)", // Bouncy pop
+
+         display: "flex",
+         alignItems: "center",
+         justifyContent: "center",
+         minWidth: "80px",
+      });
+
+      document.body.appendChild(overlay);
+   };
+
+   const showBoostOverlay = () => {
+      const el = document.getElementById("yqs-boost-overlay");
+      if (!el) createBoostOverlay();
+
+      const overlay = document.getElementById("yqs-boost-overlay");
+      const textSpan = document.getElementById("yqs-boost-text");
+
+      if (overlay) {
+         if (textSpan) textSpan.textContent = `${state.boostSpeed}x`;
+
+         overlay.style.opacity = "1";
+         overlay.style.transform = "translateX(-50%) scale(1)";
+         overlay.style.top = "12%";
+      }
+   };
+
+   const hideBoostOverlay = () => {
+      const overlay = document.getElementById("yqs-boost-overlay");
+      if (overlay) {
+         overlay.style.opacity = "0";
+         overlay.style.transform = "translateX(-50%) scale(0.8)";
+      }
+   };
+
+   // ---------------------------------------------------------
+   // STORAGE & PERSISTENCE
+   // ---------------------------------------------------------
+   const STORAGE_KEY = "yt_quick_speed_settings";
+
+   const saveSettings = () => {
+      const settings = {
+         targetSpeed: state.targetSpeed,
+         isAutoSkipEnabled: state.isAutoSkipEnabled,
+         isSpeedAdEnabled: state.isSpeedAdEnabled,
+         isZenModeEnabled: state.isZenModeEnabled,
+         isBoosterEnabled: state.isBoosterEnabled,
+         volume: state.volume,
+         // Focus Persistence
+         isFocusModeEnabled: state.isFocusModeEnabled,
+         isStrictModeEnabled: state.isStrictModeEnabled,
+         focusKeywords: state.focusKeywords,
+         activeCategories: state.activeCategories,
+         customCategories: state.customCategories,
+         isMirrored: state.isMirrored,
+      };
+      chrome.storage.local.set({ [STORAGE_KEY]: settings });
+   };
+
+   const loadSettings = () => {
+      chrome.storage.local.get([STORAGE_KEY], (result) => {
+         if (result[STORAGE_KEY]) {
+            const saved = result[STORAGE_KEY];
+            if (saved.targetSpeed) state.targetSpeed = saved.targetSpeed;
+            if (saved.isAutoSkipEnabled !== undefined) state.isAutoSkipEnabled = saved.isAutoSkipEnabled;
+            if (saved.isSpeedAdEnabled !== undefined) state.isSpeedAdEnabled = saved.isSpeedAdEnabled;
+            if (saved.isBoosterEnabled !== undefined) state.isBoosterEnabled = saved.isBoosterEnabled;
+
+            // Load Focus
+            if (saved.isFocusModeEnabled !== undefined) state.isFocusModeEnabled = saved.isFocusModeEnabled;
+            if (saved.isStrictModeEnabled !== undefined) state.isStrictModeEnabled = saved.isStrictModeEnabled;
+            if (saved.focusKeywords !== undefined) state.focusKeywords = saved.focusKeywords;
+            if (saved.activeCategories !== undefined) state.activeCategories = saved.activeCategories;
+            if (saved.customCategories !== undefined) state.customCategories = saved.customCategories;
+
+            if (saved.volume !== undefined) {
+               state.volume = saved.volume;
+               setVolume(state.volume);
+            }
+
+            // Visual settings
+            if (saved.isZenModeEnabled !== undefined) {
+               state.isZenModeEnabled = saved.isZenModeEnabled;
+               toggleZenMode(state.isZenModeEnabled);
+            }
+
+            if (saved.isMirrored !== undefined) {
+               state.isMirrored = saved.isMirrored;
+               toggleMirror(state.isMirrored);
+            }
+
+            // Trigger filter on load
+            if (state.isFocusModeEnabled) runFocusFilter();
+         }
+      });
+   };
+
+   // ---------------------------------------------------------
+   // ZEN MODE LOGIC
+   // ---------------------------------------------------------
+   const updateZenStyle = (enabled) => {
+      const styleId = "yqs-zen-mode-style";
+      let style = document.getElementById(styleId);
+
+      if (enabled) {
+         if (!style) {
+            style = document.createElement("style");
+            style.id = styleId;
+            style.textContent = `
                 ytd-watch-flexy #secondary, 
                 ytd-watch-flexy #related,
                 ytd-comments,
@@ -271,577 +590,578 @@ const updateZenStyle = (enabled) => {
                     margin: 0 auto !important;
                 }
             `;
-         (document.head || document.documentElement).appendChild(style);
-      }
-   } else {
-      if (style) {
-         style.remove();
-      }
-   }
-};
-
-const toggleMirror = (enabled) => {
-   state.isMirrored = enabled;
-   const video = getVideo();
-   if (video) {
-      if (enabled) {
-         video.style.transform = "scaleX(-1)";
+            (document.head || document.documentElement).appendChild(style);
+         }
       } else {
-         video.style.transform = "";
-      }
-   }
-};
-
-const takeSnapshot = () => {
-   const video = getVideo();
-   if (!video) return;
-
-   try {
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-
-      // If mirrored, flip the context too so screenshot matches view
-      if (state.isMirrored) {
-         ctx.translate(canvas.width, 0);
-         ctx.scale(-1, 1);
-      }
-
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const dataURL = canvas.toDataURL("image/png");
-      const link = document.createElement("a");
-      link.download = `snapshot_${Date.now()}.png`;
-      link.href = dataURL;
-      link.click();
-   } catch (e) {
-      console.error("Snapshot failed", e);
-   }
-};
-
-const toggleZenMode = (enabled) => {
-   state.isZenModeEnabled = enabled;
-   updateZenStyle(enabled);
-};
-
-// ---------------------------------------------------------
-// AUDIO BOOSTER LOGIC
-// ---------------------------------------------------------
-let audioCtx;
-let source;
-let gainNode;
-
-const initAudioBooster = () => {
-   const video = getVideo();
-   if (!video || audioCtx) return;
-
-   try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      audioCtx = new AudioContext();
-      source = audioCtx.createMediaElementSource(video);
-      gainNode = audioCtx.createGain();
-      source.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      gainNode.gain.value = state.volume;
-   } catch (e) {
-      // console.error("[SpeedController] Audio Init Failed", e);
-   }
-};
-
-const setVolume = (val) => {
-   state.volume = val;
-   if (!audioCtx) initAudioBooster();
-   if (gainNode) gainNode.gain.value = val;
-};
-
-// ---------------------------------------------------------
-// SPEED & BOOST HANDLERS
-// ---------------------------------------------------------
-const isInputActive = () => {
-   const el = document.activeElement;
-   if (!el) return false;
-   const tagName = el.tagName;
-
-   if (tagName === "INPUT" || tagName === "TEXTAREA") return true;
-   if (el.isContentEditable) return true;
-
-   // Check specific YouTube search/comment inputs
-   const id = el.id || "";
-   if (id === "contenteditable-root") return true;
-   if (id === "search") return true;
-
-   return false;
-};
-
-document.addEventListener(
-   "keydown",
-   (e) => {
-      if (!state.isBoosterEnabled) return;
-      if (isInputActive()) return;
-      if (fundingChoicesHandled) return;
-
-      // Check for Configured Boost Key
-      const keyMap = {
-         Shift: ["Shift", "ShiftLeft", "ShiftRight"],
-         Control: ["Control", "ControlLeft", "ControlRight"],
-         Alt: ["Alt", "AltLeft", "AltRight"],
-      };
-
-      const allowedKeys = keyMap[state.boostKey] || keyMap["Shift"];
-
-      if (allowedKeys.includes(e.key) || allowedKeys.includes(e.code)) {
-         if (!state.isKeyBoosting) {
-            state.isKeyBoosting = true;
-            if (!cachedIsAdPlaying) {
-               showBoostOverlay();
-               enforceSpeed();
-            }
+         if (style) {
+            style.remove();
          }
       }
-   },
-   true,
-);
+   };
 
-document.addEventListener(
-   "keyup",
-   (e) => {
-      if (!state.isBoosterEnabled) return;
+   const toggleMirror = (enabled) => {
+      state.isMirrored = enabled;
+      const video = getVideo();
+      if (video) {
+         if (enabled) {
+            video.style.transform = "scaleX(-1)";
+         } else {
+            video.style.transform = "";
+         }
+      }
+   };
 
-      const keyMap = {
-         Shift: ["Shift", "ShiftLeft", "ShiftRight"],
-         Control: ["Control", "ControlLeft", "ControlRight"],
-         Alt: ["Alt", "AltLeft", "AltRight"],
-      };
+   const takeSnapshot = () => {
+      const video = getVideo();
+      if (!video) return;
 
-      const allowedKeys = keyMap[state.boostKey] || keyMap["Shift"];
+      try {
+         const canvas = document.createElement("canvas");
+         canvas.width = video.videoWidth;
+         canvas.height = video.videoHeight;
+         const ctx = canvas.getContext("2d");
 
-      if (allowedKeys.includes(e.key) || allowedKeys.includes(e.code)) {
+         // If mirrored, flip the context too so screenshot matches view
+         if (state.isMirrored) {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+         }
+
+         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+         const dataURL = canvas.toDataURL("image/png");
+         const link = document.createElement("a");
+         link.download = `snapshot_${Date.now()}.png`;
+         link.href = dataURL;
+         link.click();
+      } catch (e) {
+         console.error("Snapshot failed", e);
+      }
+   };
+
+   const toggleZenMode = (enabled) => {
+      state.isZenModeEnabled = enabled;
+      updateZenStyle(enabled);
+   };
+
+   // ---------------------------------------------------------
+   // AUDIO BOOSTER LOGIC
+   // ---------------------------------------------------------
+   let audioCtx;
+   let source;
+   let gainNode;
+
+   const initAudioBooster = () => {
+      const video = getVideo();
+      if (!video || audioCtx) return;
+
+      try {
+         const AudioContext = window.AudioContext || window.webkitAudioContext;
+         audioCtx = new AudioContext();
+         source = audioCtx.createMediaElementSource(video);
+         gainNode = audioCtx.createGain();
+         source.connect(gainNode);
+         gainNode.connect(audioCtx.destination);
+         gainNode.gain.value = state.volume;
+      } catch (e) {
+         // console.error("[SpeedController] Audio Init Failed", e);
+      }
+   };
+
+   const setVolume = (val) => {
+      state.volume = val;
+      if (!audioCtx) initAudioBooster();
+      if (gainNode) gainNode.gain.value = val;
+   };
+
+   // ---------------------------------------------------------
+   // SPEED & BOOST HANDLERS
+   // ---------------------------------------------------------
+   const isInputActive = () => {
+      const el = document.activeElement;
+      if (!el) return false;
+      const tagName = el.tagName;
+
+      if (tagName === "INPUT" || tagName === "TEXTAREA") return true;
+      if (el.isContentEditable) return true;
+
+      // Check specific YouTube search/comment inputs
+      const id = el.id || "";
+      if (id === "contenteditable-root") return true;
+      if (id === "search") return true;
+
+      return false;
+   };
+
+   document.addEventListener(
+      "keydown",
+      (e) => {
+         if (!state.isBoosterEnabled) return;
+         if (isInputActive()) return;
+         if (fundingChoicesHandled) return;
+
+         // Check for Configured Boost Key
+         const keyMap = {
+            Shift: ["Shift", "ShiftLeft", "ShiftRight"],
+            Control: ["Control", "ControlLeft", "ControlRight"],
+            Alt: ["Alt", "AltLeft", "AltRight"],
+         };
+
+         const allowedKeys = keyMap[state.boostKey] || keyMap["Shift"];
+
+         if (allowedKeys.includes(e.key) || allowedKeys.includes(e.code)) {
+            if (!state.isKeyBoosting) {
+               state.isKeyBoosting = true;
+               if (!cachedIsAdPlaying) {
+                  showBoostOverlay();
+                  enforceSpeed();
+               }
+            }
+         }
+      },
+      true,
+   );
+
+   document.addEventListener(
+      "keyup",
+      (e) => {
+         if (!state.isBoosterEnabled) return;
+
+         const keyMap = {
+            Shift: ["Shift", "ShiftLeft", "ShiftRight"],
+            Control: ["Control", "ControlLeft", "ControlRight"],
+            Alt: ["Alt", "AltLeft", "AltRight"],
+         };
+
+         const allowedKeys = keyMap[state.boostKey] || keyMap["Shift"];
+
+         if (allowedKeys.includes(e.key) || allowedKeys.includes(e.code)) {
+            state.isKeyBoosting = false;
+            hideBoostOverlay();
+            enforceSpeed();
+         }
+      },
+      true,
+   );
+
+   window.addEventListener("blur", () => {
+      if (state.isKeyBoosting) {
          state.isKeyBoosting = false;
          hideBoostOverlay();
          enforceSpeed();
       }
-   },
-   true,
-);
+   });
 
-window.addEventListener("blur", () => {
-   if (state.isKeyBoosting) {
-      state.isKeyBoosting = false;
-      hideBoostOverlay();
-      enforceSpeed();
-   }
-});
+   // ---------------------------------------------------------
+   // AD DETECTION
+   // ---------------------------------------------------------
+   const detectAdState = () => {
+      const player = document.querySelector(".html5-video-player");
+      const hasAdClass = player && (player.classList.contains("ad-showing") || player.classList.contains("ad-interrupting"));
 
-// ---------------------------------------------------------
-// AD DETECTION
-// ---------------------------------------------------------
-const detectAdState = () => {
-   const player = document.querySelector(".html5-video-player");
-   const hasAdClass = player && (player.classList.contains("ad-showing") || player.classList.contains("ad-interrupting"));
+      // Check specific ad module content
+      const adModule = document.querySelector(".ytp-ad-module");
+      const hasAdModuleContent = adModule && adModule.children.length > 0 && adModule.querySelector('[class*="ad-player-overlay"]');
 
-   // Check specific ad module content
-   const adModule = document.querySelector(".ytp-ad-module");
-   const hasAdModuleContent = adModule && adModule.children.length > 0 && adModule.querySelector('[class*="ad-player-overlay"]');
+      const hasAdOverlay = document.querySelector(".ytp-ad-player-overlay") !== null;
+      const hasSkipButton =
+         document.querySelector(".ytp-ad-skip-button") !== null || document.querySelector(".ytp-skip-ad-button") !== null;
+      const hasPreview = document.querySelector(".ytp-preview-ad") !== null;
 
-   const hasAdOverlay = document.querySelector(".ytp-ad-player-overlay") !== null;
-   const hasSkipButton = document.querySelector(".ytp-ad-skip-button") !== null || document.querySelector(".ytp-skip-ad-button") !== null;
-   const hasPreview = document.querySelector(".ytp-preview-ad") !== null;
+      return hasAdClass || hasAdOverlay || hasSkipButton || hasPreview || !!hasAdModuleContent;
+   };
 
-   return hasAdClass || hasAdOverlay || hasSkipButton || hasPreview || !!hasAdModuleContent;
-};
+   // ---------------------------------------------------------
+   // STATE MANAGEMENT
+   // ---------------------------------------------------------
+   let adInterval = null;
 
-// ---------------------------------------------------------
-// STATE MANAGEMENT
-// ---------------------------------------------------------
-let adInterval = null;
+   const updateAdState = () => {
+      const isAdNow = detectAdState();
 
-const updateAdState = () => {
-   const isAdNow = detectAdState();
+      // NO CHANGE -> EXIT
+      if (isAdNow === cachedIsAdPlaying) {
+         if (cachedIsAdPlaying) enforceSpeed();
+         return;
+      }
 
-   // NO CHANGE -> EXIT
-   if (isAdNow === cachedIsAdPlaying) {
-      if (cachedIsAdPlaying) enforceSpeed();
-      return;
-   }
+      // STATE CHANGE: FALSE -> TRUE (Ad Started)
+      if (isAdNow && !cachedIsAdPlaying) {
+         cachedIsAdPlaying = true;
+         hideBoostOverlay();
 
-   // STATE CHANGE: FALSE -> TRUE (Ad Started)
-   if (isAdNow && !cachedIsAdPlaying) {
-      cachedIsAdPlaying = true;
-      hideBoostOverlay();
+         // Start Ad Ad Loop - NO FORCE PLAY, NO COMPLEX CLICKS
+         if (!adInterval) {
+            skipAd();
 
-      // Start Ad Ad Loop - NO FORCE PLAY, NO COMPLEX CLICKS
-      if (!adInterval) {
-         skipAd();
+            let lastSrc = "";
+            const video = getVideo();
+            if (video) lastSrc = video.src;
 
-         let lastSrc = "";
+            adInterval = setInterval(() => {
+               // Consecutive Ad Check: If src changes, reset skip state
+               const currentVideo = getVideo();
+               if (currentVideo && currentVideo.src !== lastSrc) {
+                  lastSrc = currentVideo.src;
+                  state.adSkipClicked = false; // Reset for Ad 2
+                  // console.log("[SpeedController] Ad Source Changed (Sequential Ad)");
+               }
+
+               // Gentle Play Enforcement: If ad pauses (buffer/glitch), nudge it
+               if (currentVideo && currentVideo.paused && !currentVideo.ended) {
+                  try {
+                     currentVideo.play().catch(() => {}); // Silent catch
+                  } catch (e) {}
+               }
+
+               if (state.isAutoSkipEnabled) skipAd();
+               enforceSpeed();
+            }, 100);
+         }
+      }
+
+      // STATE CHANGE: TRUE -> FALSE (Ad Ended)
+      else if (!isAdNow && cachedIsAdPlaying) {
+         // Graceful Exit: Ensure no skip button is lingering
+         // If skipAd() returns TRUE, it means a button was found and clicked, so we are logically still "In Ad" for the user.
+         // We keep the loop alive.
+         if (state.isAutoSkipEnabled && skipAd()) {
+            // console.log("[SpeedController] Ad signal away, but Skip Button found. Keeping loop.");
+            return;
+         }
+
+         cachedIsAdPlaying = false;
+
+         if (adInterval) {
+            clearInterval(adInterval);
+            adInterval = null;
+         }
+
+         state.isAdSpeeding = false;
+         state.adSkipClicked = false;
+
+         // Restore and Sanity Check
          const video = getVideo();
-         if (video) lastSrc = video.src;
-
-         adInterval = setInterval(() => {
-            // Consecutive Ad Check: If src changes, reset skip state
-            const currentVideo = getVideo();
-            if (currentVideo && currentVideo.src !== lastSrc) {
-               lastSrc = currentVideo.src;
-               state.adSkipClicked = false; // Reset for Ad 2
-               // console.log("[SpeedController] Ad Source Changed (Sequential Ad)");
+         if (video) {
+            if (state.isSpeedAdEnabled && state.originalMuted !== undefined) {
+               video.muted = state.originalMuted;
             }
 
-            // Gentle Play Enforcement: If ad pauses (buffer/glitch), nudge it
-            if (currentVideo && currentVideo.paused && !currentVideo.ended) {
-               try {
-                  currentVideo.play().catch(() => {}); // Silent catch
-               } catch (e) {}
+            // CRITICAL FIX: Ensure we don't accidentally keep 16x speed
+            // If speed is excessively high and we are not boosting, force reset.
+            if (video.playbackRate > 8.0) {
+               video.playbackRate = state.targetSpeed || 1.0;
+            } else {
+               enforceSpeed();
             }
+         }
 
-            if (state.isAutoSkipEnabled) skipAd();
-            enforceSpeed();
-         }, 100);
+         if (state.isKeyBoosting && !fundingChoicesHandled) {
+            showBoostOverlay();
+         }
       }
-   }
+   };
 
-   // STATE CHANGE: TRUE -> FALSE (Ad Ended)
-   else if (!isAdNow && cachedIsAdPlaying) {
-      // Graceful Exit: Ensure no skip button is lingering
-      // If skipAd() returns TRUE, it means a button was found and clicked, so we are logically still "In Ad" for the user.
-      // We keep the loop alive.
-      if (state.isAutoSkipEnabled && skipAd()) {
-         // console.log("[SpeedController] Ad signal away, but Skip Button found. Keeping loop.");
-         return;
-      }
-
-      cachedIsAdPlaying = false;
-
-      if (adInterval) {
-         clearInterval(adInterval);
-         adInterval = null;
-      }
-
-      state.isAdSpeeding = false;
-      state.adSkipClicked = false;
-
-      // Restore and Sanity Check
+   // ---------------------------------------------------------
+   // SPEED ENFORCER
+   // ---------------------------------------------------------
+   const enforceSpeed = () => {
       const video = getVideo();
-      if (video) {
-         if (state.isSpeedAdEnabled && state.originalMuted !== undefined) {
-            video.muted = state.originalMuted;
+      if (!video) return;
+
+      // CRITICAL: Double-check Ad State before enforcement
+      // This prevents "stuck" Ad Mode if the observer missed the transition
+      const isActuallyAd = detectAdState();
+
+      if (cachedIsAdPlaying && !isActuallyAd) {
+         // We thought it was an ad, but it's not. Correct state immediately.
+         cachedIsAdPlaying = false;
+      }
+
+      // AD MODE
+      if (isActuallyAd || cachedIsAdPlaying) {
+         if (!cachedIsAdPlaying) cachedIsAdPlaying = true; // Sync
+         hideBoostOverlay();
+
+         if (state.isSpeedAdEnabled) {
+            if (!state.isAdSpeeding) {
+               state.originalSpeed = state.targetSpeed;
+               state.originalMuted = video.muted;
+               state.isAdSpeeding = true;
+            }
+            // Force 16x
+            if (video.playbackRate !== 16.0) video.playbackRate = 16.0;
+            if (!video.muted) video.muted = true;
          }
-
-         // CRITICAL FIX: Ensure we don't accidentally keep 16x speed
-         // If speed is excessively high and we are not boosting, force reset.
-         if (video.playbackRate > 8.0) {
-            video.playbackRate = state.targetSpeed || 1.0;
-         } else {
-            enforceSpeed();
-         }
-      }
-
-      if (state.isKeyBoosting && !fundingChoicesHandled) {
-         showBoostOverlay();
-      }
-   }
-};
-
-// ---------------------------------------------------------
-// SPEED ENFORCER
-// ---------------------------------------------------------
-const enforceSpeed = () => {
-   const video = getVideo();
-   if (!video) return;
-
-   // CRITICAL: Double-check Ad State before enforcement
-   // This prevents "stuck" Ad Mode if the observer missed the transition
-   const isActuallyAd = detectAdState();
-
-   if (cachedIsAdPlaying && !isActuallyAd) {
-      // We thought it was an ad, but it's not. Correct state immediately.
-      cachedIsAdPlaying = false;
-   }
-
-   // AD MODE
-   if (isActuallyAd || cachedIsAdPlaying) {
-      if (!cachedIsAdPlaying) cachedIsAdPlaying = true; // Sync
-      hideBoostOverlay();
-
-      if (state.isSpeedAdEnabled) {
-         if (!state.isAdSpeeding) {
-            state.originalSpeed = state.targetSpeed;
-            state.originalMuted = video.muted;
-            state.isAdSpeeding = true;
-         }
-         // Force 16x
-         if (video.playbackRate !== 16.0) video.playbackRate = 16.0;
-         if (!video.muted) video.muted = true;
-      }
-      return;
-   }
-
-   // CONTENT MODE (Correction)
-   if (state.isAdSpeeding) {
-      video.muted = state.originalMuted || false;
-      video.playbackRate = state.originalSpeed || state.targetSpeed;
-      state.isAdSpeeding = false;
-   }
-
-   // Key Boosting
-   if (state.isKeyBoosting) {
-      if (Math.abs(video.playbackRate - state.boostSpeed) > 0.1) {
-         video.playbackRate = state.boostSpeed;
-      }
-      return;
-   }
-
-   // Normal Speed
-   if (!Number.isNaN(state.targetSpeed) && state.targetSpeed > 0) {
-      if (Math.abs(video.playbackRate - state.targetSpeed) > 0.01) {
-         video.playbackRate = state.targetSpeed;
-      }
-   }
-};
-
-const skipAd = () => {
-   const selectors = [".ytp-skip-ad-button", ".ytp-ad-skip-button", ".ytp-ad-skip-button-modern", "button[id^='skip-button']"];
-
-   const candidates = document.querySelectorAll(selectors.join(","));
-
-   for (const btn of candidates) {
-      if (!btn || btn.disabled) continue;
-
-      const style = window.getComputedStyle(btn);
-      let visible = style.display !== "none" && style.visibility !== "hidden";
-
-      const isFullscreen = document.fullscreenElement !== null;
-      if (visible && !isFullscreen) {
-         if (btn.getBoundingClientRect().width === 0) continue;
-      }
-
-      btn.click(); // ONE real click
-      state.adSkipClicked = true;
-      return true;
-   }
-   return false;
-};
-
-// Helper for other popups (still needed for generic overlays)
-const triggerClick = (el) => {
-   if (el && typeof el.click === "function") el.click();
-};
-
-// ---------------------------------------------------------
-// POPUP HANDLER (Enforcement & Funding Choices)
-// ---------------------------------------------------------
-let popupCooldown = false;
-
-const handlePopups = () => {
-   if (popupCooldown) return;
-
-   // 1. SPECIFIC CHECK: YouTube "Ad blockers are not allowed" dialog (Repeated handling allowed with cooldown)
-   const enforcement = document.querySelector("ytd-enforcement-message-view-model");
-   if (enforcement) {
-      const closeBtn = enforcement.querySelector("#dismiss-button button") || enforcement.querySelector('button[aria-label="Close"]');
-
-      if (closeBtn) {
-         triggerClick(closeBtn);
-         popupCooldown = true;
-         setTimeout(() => {
-            popupCooldown = false;
-         }, 1000);
          return;
       }
-   }
 
-   // 2. FUNDING CHOICES CHECK (Strict One-Time Refresh)
-   if (fundingChoicesHandled) return; // Stop if already handled funding choices
-
-   const fundingSelectors = ['c-wiz[jsrenderer="TmgpI"]', ".SSPGKf", 'iframe[src*="fundingchoices.google.com"]'];
-
-   let popup = null;
-   for (const sel of fundingSelectors) {
-      const el = document.querySelector(sel);
-      if (el && (el.offsetWidth > 0 || el.offsetHeight > 0)) {
-         popup = el;
-         break;
+      // CONTENT MODE (Correction)
+      if (state.isAdSpeeding) {
+         video.muted = state.originalMuted || false;
+         video.playbackRate = state.originalSpeed || state.targetSpeed;
+         state.isAdSpeeding = false;
       }
-   }
 
-   if (popup) {
-      const buttons = popup.querySelectorAll('button, div[role="button"], a[role="button"]');
-      for (const btn of buttons) {
-         const text = (btn.innerText || "").toLowerCase();
-         const label = (btn.getAttribute("aria-label") || "").toLowerCase();
+      // Key Boosting
+      if (state.isKeyBoosting) {
+         if (Math.abs(video.playbackRate - state.boostSpeed) > 0.1) {
+            video.playbackRate = state.boostSpeed;
+         }
+         return;
+      }
 
-         if (text.includes("refresh") || label.includes("refresh")) {
-            triggerClick(btn);
-            fundingChoicesHandled = true; // STRICT ONE-TIME
-            if (adInterval) clearInterval(adInterval);
+      // Normal Speed
+      if (!Number.isNaN(state.targetSpeed) && state.targetSpeed > 0) {
+         if (Math.abs(video.playbackRate - state.targetSpeed) > 0.01) {
+            video.playbackRate = state.targetSpeed;
+         }
+      }
+   };
+
+   const skipAd = () => {
+      const selectors = [".ytp-skip-ad-button", ".ytp-ad-skip-button", ".ytp-ad-skip-button-modern", "button[id^='skip-button']"];
+
+      const candidates = document.querySelectorAll(selectors.join(","));
+
+      for (const btn of candidates) {
+         if (!btn || btn.disabled) continue;
+
+         const style = window.getComputedStyle(btn);
+         let visible = style.display !== "none" && style.visibility !== "hidden";
+
+         const isFullscreen = document.fullscreenElement !== null;
+         if (visible && !isFullscreen) {
+            if (btn.getBoundingClientRect().width === 0) continue;
+         }
+
+         btn.click(); // ONE real click
+         state.adSkipClicked = true;
+         return true;
+      }
+      return false;
+   };
+
+   // Helper for other popups (still needed for generic overlays)
+   const triggerClick = (el) => {
+      if (el && typeof el.click === "function") el.click();
+   };
+
+   // ---------------------------------------------------------
+   // POPUP HANDLER (Enforcement & Funding Choices)
+   // ---------------------------------------------------------
+   let popupCooldown = false;
+
+   const handlePopups = () => {
+      if (popupCooldown) return;
+
+      // 1. SPECIFIC CHECK: YouTube "Ad blockers are not allowed" dialog (Repeated handling allowed with cooldown)
+      const enforcement = document.querySelector("ytd-enforcement-message-view-model");
+      if (enforcement) {
+         const closeBtn = enforcement.querySelector("#dismiss-button button") || enforcement.querySelector('button[aria-label="Close"]');
+
+         if (closeBtn) {
+            triggerClick(closeBtn);
+            popupCooldown = true;
+            setTimeout(() => {
+               popupCooldown = false;
+            }, 1000);
             return;
          }
       }
-   }
-};
 
-// ---------------------------------------------------------
-// LOOP LOGIC
-// ---------------------------------------------------------
-const checkLoop = () => {
-   if (!state.loop.active || state.loop.start === null || state.loop.end === null) return;
-   if (cachedIsAdPlaying) return;
+      // 2. FUNDING CHOICES CHECK (Strict One-Time Refresh)
+      if (fundingChoicesHandled) return; // Stop if already handled funding choices
 
-   const video = getVideo();
-   if (!video) return;
+      const fundingSelectors = ['c-wiz[jsrenderer="TmgpI"]', ".SSPGKf", 'iframe[src*="fundingchoices.google.com"]'];
 
-   if (video.currentTime >= state.loop.end) {
-      video.currentTime = state.loop.start;
-   }
-};
-
-// ---------------------------------------------------------
-// FOCUS FILTER LOGIC (NEW)
-// ---------------------------------------------------------
-
-/**
- * Checks if a string contains any of the blocked keywords
- * @param {string} text
- * @returns {boolean}
- */
-const containsKeyword = (text) => {
-   if (!text || typeof text !== "string") return false;
-   const lowerText = text.toLowerCase();
-
-   // Exact match word boundary check or simple includes?
-   // Simple includes is safer for broad filtering initially requested (e.g. "politics").
-
-   // 1. Check Custom Keywords
-   if (state.focusKeywords.some((keyword) => lowerText.includes(keyword.toLowerCase()))) {
-      return true;
-   }
-
-   // 2. Check Active Categories (Both Preset and Custom)
-   if (state.activeCategories && state.activeCategories.length > 0) {
-      for (const catId of state.activeCategories) {
-         let keywords = [];
-
-         // Check if it's a Preset
-         if (PRESET_CATEGORIES[catId]) {
-            keywords = PRESET_CATEGORIES[catId];
+      let popup = null;
+      for (const sel of fundingSelectors) {
+         const el = document.querySelector(sel);
+         if (el && (el.offsetWidth > 0 || el.offsetHeight > 0)) {
+            popup = el;
+            break;
          }
-         // Check if it's a Custom Category
-         else {
-            const customCat = state.customCategories.find((c) => c.id === catId);
-            if (customCat && customCat.keywords) {
-               keywords = customCat.keywords;
+      }
+
+      if (popup) {
+         const buttons = popup.querySelectorAll('button, div[role="button"], a[role="button"]');
+         for (const btn of buttons) {
+            const text = (btn.innerText || "").toLowerCase();
+            const label = (btn.getAttribute("aria-label") || "").toLowerCase();
+
+            if (text.includes("refresh") || label.includes("refresh")) {
+               triggerClick(btn);
+               fundingChoicesHandled = true; // STRICT ONE-TIME
+               if (adInterval) clearInterval(adInterval);
+               return;
             }
          }
+      }
+   };
 
-         if (keywords && keywords.some((k) => lowerText.includes(k.toLowerCase()))) {
-            return true;
+   // ---------------------------------------------------------
+   // LOOP LOGIC
+   // ---------------------------------------------------------
+   const checkLoop = () => {
+      if (!state.loop.active || state.loop.start === null || state.loop.end === null) return;
+      if (cachedIsAdPlaying) return;
+
+      const video = getVideo();
+      if (!video) return;
+
+      if (video.currentTime >= state.loop.end) {
+         video.currentTime = state.loop.start;
+      }
+   };
+
+   // ---------------------------------------------------------
+   // FOCUS FILTER LOGIC (NEW)
+   // ---------------------------------------------------------
+
+   /**
+    * Checks if a string contains any of the blocked keywords
+    * @param {string} text
+    * @returns {boolean}
+    */
+   const containsKeyword = (text) => {
+      if (!text || typeof text !== "string") return false;
+      const lowerText = text.toLowerCase();
+
+      // Exact match word boundary check or simple includes?
+      // Simple includes is safer for broad filtering initially requested (e.g. "politics").
+
+      // 1. Check Custom Keywords
+      if (state.focusKeywords.some((keyword) => lowerText.includes(keyword.toLowerCase()))) {
+         return true;
+      }
+
+      // 2. Check Active Categories (Both Preset and Custom)
+      if (state.activeCategories && state.activeCategories.length > 0) {
+         for (const catId of state.activeCategories) {
+            let keywords = [];
+
+            // Check if it's a Preset
+            if (PRESET_CATEGORIES[catId]) {
+               keywords = PRESET_CATEGORIES[catId];
+            }
+            // Check if it's a Custom Category
+            else {
+               const customCat = state.customCategories.find((c) => c.id === catId);
+               if (customCat && customCat.keywords) {
+                  keywords = customCat.keywords;
+               }
+            }
+
+            if (keywords && keywords.some((k) => lowerText.includes(k.toLowerCase()))) {
+               return true;
+            }
          }
       }
-   }
 
-   return false;
-};
+      return false;
+   };
 
-/**
- * Main filtering function
- */
-const runFocusFilter = () => {
-   if (!state.isFocusModeEnabled) return;
+   /**
+    * Main filtering function
+    */
+   const runFocusFilter = () => {
+      if (!state.isFocusModeEnabled) return;
 
-   // Proceed if we have keywords OR active categories
-   const hasKeywords = state.focusKeywords && state.focusKeywords.length > 0;
-   const hasCategories = state.activeCategories && state.activeCategories.length > 0;
+      // Proceed if we have keywords OR active categories
+      const hasKeywords = state.focusKeywords && state.focusKeywords.length > 0;
+      const hasCategories = state.activeCategories && state.activeCategories.length > 0;
 
-   if (!hasKeywords && !hasCategories) return;
+      if (!hasKeywords && !hasCategories) return;
 
-   // Selectors for Video Cards (Grid, List, Recommendations)
-   // ytd-rich-item-renderer: Homepage grid items
-   // ytd-compact-video-renderer: Sidebar recommendations
-   // ytd-video-renderer: Search results
-   // ytd-grid-video-renderer: Channel videos
-   // ytm-video-with-context-renderer: Mobile/Modern grid
-   // ytd-reel-item-renderer: Shorts in grid
+      // Selectors for Video Cards (Grid, List, Recommendations)
+      // ytd-rich-item-renderer: Homepage grid items
+      // ytd-compact-video-renderer: Sidebar recommendations
+      // ytd-video-renderer: Search results
+      // ytd-grid-video-renderer: Channel videos
+      // ytm-video-with-context-renderer: Mobile/Modern grid
+      // ytd-reel-item-renderer: Shorts in grid
 
-   const cardSelectors = [
-      "ytd-rich-item-renderer",
-      "ytd-compact-video-renderer",
-      "ytd-video-renderer",
-      "ytd-grid-video-renderer",
-      "ytd-reel-item-renderer",
-      "ytm-video-with-context-renderer",
-   ];
+      const cardSelectors = [
+         "ytd-rich-item-renderer",
+         "ytd-compact-video-renderer",
+         "ytd-video-renderer",
+         "ytd-grid-video-renderer",
+         "ytd-reel-item-renderer",
+         "ytm-video-with-context-renderer",
+      ];
 
-   const cards = document.querySelectorAll(cardSelectors.join(","));
+      const cards = document.querySelectorAll(cardSelectors.join(","));
 
-   cards.forEach((card) => {
-      // Skip if already processed
-      if (card.dataset.yqsFiltered === "true") return;
+      cards.forEach((card) => {
+         // Skip if already processed
+         if (card.dataset.yqsFiltered === "true") return;
 
-      // Extract Text
-      // Title selector tries to find the main text.
-      // #video-title often holds the title text.
-      const titleEl = card.querySelector("#video-title") || card.querySelector("h3") || card.querySelector(".title");
-      const titleText = titleEl ? titleEl.textContent + " " + titleEl.getAttribute("title") : "";
+         // Extract Text
+         // Title selector tries to find the main text.
+         // #video-title often holds the title text.
+         const titleEl = card.querySelector("#video-title") || card.querySelector("h3") || card.querySelector(".title");
+         const titleText = titleEl ? titleEl.textContent + " " + titleEl.getAttribute("title") : "";
 
-      // Description/Snippet (for search results)
-      // #description-text or specific metadata
-      const descEl = card.querySelector("#description-text") || card.querySelector(".metadata-snippet-text");
-      const descText = descEl ? descEl.textContent : "";
+         // Description/Snippet (for search results)
+         // #description-text or specific metadata
+         const descEl = card.querySelector("#description-text") || card.querySelector(".metadata-snippet-text");
+         const descText = descEl ? descEl.textContent : "";
 
-      const fullText = (titleText + " " + descText).trim();
+         const fullText = (titleText + " " + descText).trim();
 
-      if (fullText && containsKeyword(fullText)) {
-         applyFilterAction(card);
-      }
-   });
-
-   // Shorts Shelf Special Handling (ytd-rich-shelf-renderer often holds shorts)
-   // If strict on "shorts", we might want to hide the whole shelf if title matches or just items.
-   // This is optional advanced logic, but good to have.
-};
-
-const applyFilterAction = (card) => {
-   card.dataset.yqsFiltered = "true"; // Mark processed
-
-   // Determine the container to blur (fallback to card if specific container not found)
-   const targetContainer = card.querySelector("#content") || card.querySelector("#dismissible") || card;
-
-   if (state.isStrictModeEnabled) {
-      // STRICT MODE: Clean Removal
-      // Use display: none !important to force removal from flow.
-      card.style.setProperty("display", "none", "important");
-      card.style.setProperty("visibility", "hidden", "important"); // Double tap
-   } else {
-      // DEFAULT MODE: "Premium Blur" Overlay
-      // Instead of a grey box, we blur the content and show a minimal interactable overlay.
-
-      // 1. Blur the content
-      if (targetContainer) {
-         targetContainer.style.filter = "blur(12px) grayscale(100%) opacity(0.4)";
-         targetContainer.style.pointerEvents = "none"; // Prevent clicks on blurred video
-         targetContainer.style.transition = "all 0.4s ease";
-      }
-
-      // 2. Add the minimalist overlay
-      const overlay = document.createElement("div");
-      overlay.className = "yqs-filter-overlay";
-
-      // Centered overlay styling
-      Object.assign(overlay.style, {
-         position: "absolute",
-         top: "0",
-         left: "0",
-         right: "0",
-         bottom: "0",
-         zIndex: "10",
-         display: "flex",
-         flexDirection: "column",
-         alignItems: "center",
-         justifyContent: "center",
-         pointerEvents: "auto", // Allow clicking the button
+         if (fullText && containsKeyword(fullText)) {
+            applyFilterAction(card);
+         }
       });
 
-      overlay.innerHTML = `
+      // Shorts Shelf Special Handling (ytd-rich-shelf-renderer often holds shorts)
+      // If strict on "shorts", we might want to hide the whole shelf if title matches or just items.
+      // This is optional advanced logic, but good to have.
+   };
+
+   const applyFilterAction = (card) => {
+      card.dataset.yqsFiltered = "true"; // Mark processed
+
+      // Determine the container to blur (fallback to card if specific container not found)
+      const targetContainer = card.querySelector("#content") || card.querySelector("#dismissible") || card;
+
+      if (state.isStrictModeEnabled) {
+         // STRICT MODE: Clean Removal
+         // Use display: none !important to force removal from flow.
+         card.style.setProperty("display", "none", "important");
+         card.style.setProperty("visibility", "hidden", "important"); // Double tap
+      } else {
+         // DEFAULT MODE: "Premium Blur" Overlay
+         // Instead of a grey box, we blur the content and show a minimal interactable overlay.
+
+         // 1. Blur the content
+         if (targetContainer) {
+            targetContainer.style.filter = "blur(12px) grayscale(100%) opacity(0.4)";
+            targetContainer.style.pointerEvents = "none"; // Prevent clicks on blurred video
+            targetContainer.style.transition = "all 0.4s ease";
+         }
+
+         // 2. Add the minimalist overlay
+         const overlay = document.createElement("div");
+         overlay.className = "yqs-filter-overlay";
+
+         // Centered overlay styling
+         Object.assign(overlay.style, {
+            position: "absolute",
+            top: "0",
+            left: "0",
+            right: "0",
+            bottom: "0",
+            zIndex: "10",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "auto", // Allow clicking the button
+         });
+
+         overlay.innerHTML = `
             <div style="
                 background: rgba(0,0,0,0.8); 
                 backdrop-filter: blur(8px);
@@ -871,307 +1191,308 @@ const applyFilterAction = (card) => {
             </div>
         `;
 
-      // Hover Effect for Button
-      const btn = overlay.querySelector(".yqs-reveal-btn");
-      if (btn) {
-         btn.onmouseover = () => {
-            btn.style.background = "rgba(62, 166, 255, 0.4)";
-            btn.style.borderColor = "#3ea6ff";
-         };
-         btn.onmouseout = () => {
-            btn.style.background = "rgba(62, 166, 255, 0.2)";
-            btn.style.borderColor = "rgba(62, 166, 255, 0.4)";
-         };
+         // Hover Effect for Button
+         const btn = overlay.querySelector(".yqs-reveal-btn");
+         if (btn) {
+            btn.onmouseover = () => {
+               btn.style.background = "rgba(62, 166, 255, 0.4)";
+               btn.style.borderColor = "#3ea6ff";
+            };
+            btn.onmouseout = () => {
+               btn.style.background = "rgba(62, 166, 255, 0.2)";
+               btn.style.borderColor = "rgba(62, 166, 255, 0.4)";
+            };
 
-         btn.onclick = (e) => {
-            e.stopPropagation();
-            e.preventDefault();
+            btn.onclick = (e) => {
+               e.stopPropagation();
+               e.preventDefault();
 
-            // Reveal Animation
-            overlay.style.opacity = "0";
-            overlay.style.pointerEvents = "none";
-            if (targetContainer) {
-               targetContainer.style.filter = "none";
-               targetContainer.style.pointerEvents = "auto";
-               targetContainer.style.opacity = "1";
-            }
-            // Remove after animation
-            setTimeout(() => overlay.remove(), 400);
-         };
-      }
-
-      // Ensure Card Positioning
-      const computedPos = window.getComputedStyle(card).position;
-      if (computedPos === "static") card.style.position = "relative";
-      card.appendChild(overlay);
-   }
-};
-
-// ---------------------------------------------------------
-// OPTIMIZED OBSERVERS & PASSIVE LISTENERS
-// ---------------------------------------------------------
-const initObservers = () => {
-   // 1. Popup Observer (Targeted: ytd-popup-container)
-   const popupContainer = document.querySelector("ytd-popup-container");
-   if (popupContainer) {
-      const popupObserver = new MutationObserver(() => {
-         handlePopups();
-      });
-      popupObserver.observe(popupContainer, { childList: true, subtree: true });
-   } else {
-      // Fallback: Check body but polling will cover us mostly
-      // Retry finding container, as it might load late
-      setTimeout(initObservers, 2000);
-   }
-
-   // 2. Player Observer (Specific, Attributes only)
-   const player = document.querySelector(".html5-video-player");
-   if (player) {
-      const playerObserver = new MutationObserver(() => {
-         updateAdState();
-      });
-      playerObserver.observe(player, { attributes: true, attributeFilter: ["class"] });
-   }
-
-   // 3. Grid/Feed Observer for Focus Filter
-   // Observe the main content container to detect new video loads (infinite scroll)
-   // ytd-app combines almost everything. 'content' is usually the main wrapper.
-   const contentApp = document.querySelector("ytd-app") || document.body;
-   const contentObserver = new MutationObserver((mutations) => {
-      // Throttle slightly
-      if (state.isFocusModeEnabled) {
-         runFocusFilter();
-      }
-   });
-   contentObserver.observe(contentApp, { childList: true, subtree: true });
-};
-
-// Start Observers
-initObservers();
-
-setInterval(() => {
-   const video = getVideo();
-   handlePopups();
-   if (state.isFocusModeEnabled) runFocusFilter();
-
-   // Failsafe: Always try to skip if enabled, even if detection missed it
-   if (state.isAutoSkipEnabled) skipAd();
-
-   if (video) {
-      updateAdState();
-      if (!cachedIsAdPlaying && state.loop.active && state.loop.start !== null && state.loop.end !== null) {
-         if (video.currentTime >= state.loop.end) video.currentTime = state.loop.start;
-      }
-      if (state.isZenModeEnabled) updateZenStyle(state.isZenModeEnabled);
-   }
-}, 1000);
-
-// Passive listener to avoid violation warnings from YouTube base.js
-document.addEventListener(
-   "timeupdate",
-   () => {
-      if (!cachedIsAdPlaying) checkLoop();
-   },
-   { capture: true, passive: true },
-);
-document.addEventListener("yt-navigate-finish", () => {
-   setTimeout(() => {
-      enforceSpeed();
-      initObservers(); // Re-bind if player DOM replaced
-   }, 500);
-});
-
-loadSettings();
-
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-   const video = getVideo();
-   let needSave = false;
-
-   switch (request.action) {
-      case "SET_SPEED":
-         state.targetSpeed = parseFloat(request.speed);
-         if (!state.isAdSpeeding && !state.isKeyBoosting) enforceSpeed();
-         needSave = true;
-         sendResponse({ success: true, speed: state.targetSpeed });
-         break;
-      case "TOGGLE_AUTO_SKIP":
-         state.isAutoSkipEnabled = request.enabled;
-         needSave = true;
-         sendResponse({ success: true });
-         break;
-      case "TOGGLE_SPEED_ADS":
-         state.isSpeedAdEnabled = request.enabled;
-         needSave = true;
-         sendResponse({ success: true });
-         break;
-      case "TOGGLE_ZEN_MODE":
-         toggleZenMode(request.enabled);
-         needSave = true;
-         sendResponse({ success: true });
-         break;
-      case "TOGGLE_BOOSTER":
-         state.isBoosterEnabled = request.enabled;
-         needSave = true;
-         sendResponse({ success: true });
-         break;
-      case "SET_VOLUME":
-         setVolume(parseFloat(request.value));
-         needSave = true;
-         sendResponse({ success: true });
-         break;
-      // NEW HANDLERS
-      case "SET_BOOST_KEY":
-         state.boostKey = request.key;
-         chrome.storage.local.set({ boostKey: state.boostKey }); // Auto save immediately
-         sendResponse({ success: true });
-         break;
-      case "SET_BOOST_SPEED":
-         state.boostSpeed = parseFloat(request.speed);
-         chrome.storage.local.set({ boostSpeed: state.boostSpeed }); // Auto save
-         sendResponse({ success: true });
-         break;
-      case "SET_LOOP_POINT":
-         if (!video) return;
-         if (request.point === "start") {
-            state.loop.start = video.currentTime;
-            if (state.loop.end !== null && state.loop.end < state.loop.start) state.loop.end = null;
-         } else if (request.point === "end") {
-            state.loop.end = video.currentTime;
-            if (state.loop.start === null) state.loop.start = 0;
-            if (state.loop.end !== null && state.loop.end > state.loop.start) {
-               state.loop.active = true;
-               video.currentTime = state.loop.start;
-            }
+               // Reveal Animation
+               overlay.style.opacity = "0";
+               overlay.style.pointerEvents = "none";
+               if (targetContainer) {
+                  targetContainer.style.filter = "none";
+                  targetContainer.style.pointerEvents = "auto";
+                  targetContainer.style.opacity = "1";
+               }
+               // Remove after animation
+               setTimeout(() => overlay.remove(), 400);
+            };
          }
-         sendResponse({ success: true, loop: state.loop });
-         break;
-      case "CLEAR_LOOP":
-         state.loop.active = false;
-         state.loop.start = null;
-         state.loop.end = null;
-         sendResponse({ success: true, loop: state.loop });
-         break;
 
-      // KEYWORD HANDLERS
-      case "TOGGLE_FOCUS_MODE":
-         state.isFocusModeEnabled = request.enabled;
+         // Ensure Card Positioning
+         const computedPos = window.getComputedStyle(card).position;
+         if (computedPos === "static") card.style.position = "relative";
+         card.appendChild(overlay);
+      }
+   };
+
+   // ---------------------------------------------------------
+   // OPTIMIZED OBSERVERS & PASSIVE LISTENERS
+   // ---------------------------------------------------------
+   const initObservers = () => {
+      // 1. Popup Observer (Targeted: ytd-popup-container)
+      const popupContainer = document.querySelector("ytd-popup-container");
+      if (popupContainer) {
+         const popupObserver = new MutationObserver(() => {
+            handlePopups();
+         });
+         popupObserver.observe(popupContainer, { childList: true, subtree: true });
+      } else {
+         // Fallback: Check body but polling will cover us mostly
+         // Retry finding container, as it might load late
+         setTimeout(initObservers, 2000);
+      }
+
+      // 2. Player Observer (Specific, Attributes only)
+      const player = document.querySelector(".html5-video-player");
+      if (player) {
+         const playerObserver = new MutationObserver(() => {
+            updateAdState();
+         });
+         playerObserver.observe(player, { attributes: true, attributeFilter: ["class"] });
+      }
+
+      // 3. Grid/Feed Observer for Focus Filter
+      // Observe the main content container to detect new video loads (infinite scroll)
+      // ytd-app combines almost everything. 'content' is usually the main wrapper.
+      const contentApp = document.querySelector("ytd-app") || document.body;
+      const contentObserver = new MutationObserver((mutations) => {
+         // Throttle slightly
          if (state.isFocusModeEnabled) {
             runFocusFilter();
-         } else {
-            // Optional: Un-hide everything? A reload is cleaner, but we can try to unhide.
-            // For now, reload is easiest for "Show All" or just future items won't be blocked.
-            location.reload();
          }
-         needSave = true;
-         sendResponse({ success: true });
-         break;
-      case "TOGGLE_STRICT_MODE":
-         state.isStrictModeEnabled = request.enabled;
-         // Rerun filter to update styles
-         document.querySelectorAll("[data-yqs-filtered='true']").forEach((el) => {
-            // Reset state and re-process
-            el.style.visibility = "";
-            const blocker = el.querySelector(".yqs-content-blocker");
-            if (blocker) blocker.remove();
-            delete el.dataset.yqsFiltered;
-         });
-         runFocusFilter();
-         needSave = true;
-         sendResponse({ success: true });
-         break;
-      case "ADD_KEYWORD":
-         if (request.word && !state.focusKeywords.includes(request.word)) {
-            state.focusKeywords.push(request.word);
-            runFocusFilter();
-            needSave = true;
-         }
-         sendResponse({ success: true, keywords: state.focusKeywords });
-         break;
-      case "REMOVE_KEYWORD":
-         state.focusKeywords = state.focusKeywords.filter((k) => k !== request.word);
-         // Rerun logic might be creating false negatives if we don't un-hide.
-         // Simpler to reload or just let the user know changes apply on new content/reload.
-         // Actually, let's just save.
-         needSave = true;
-         sendResponse({ success: true, keywords: state.focusKeywords });
-         break;
+      });
+      contentObserver.observe(contentApp, { childList: true, subtree: true });
+   };
 
-      case "TOGGLE_CATEGORY":
-         if (request.category) {
-            if (request.enabled) {
-               if (!state.activeCategories.includes(request.category)) {
-                  state.activeCategories.push(request.category);
+   // Start Observers
+   initObservers();
+
+   setInterval(() => {
+      const video = getVideo();
+      handlePopups();
+      if (state.isFocusModeEnabled) runFocusFilter();
+
+      // Failsafe: Always try to skip if enabled, even if detection missed it
+      if (state.isAutoSkipEnabled) skipAd();
+
+      if (video) {
+         updateAdState();
+         if (!cachedIsAdPlaying && state.loop.active && state.loop.start !== null && state.loop.end !== null) {
+            if (video.currentTime >= state.loop.end) video.currentTime = state.loop.start;
+         }
+         if (state.isZenModeEnabled) updateZenStyle(state.isZenModeEnabled);
+      }
+   }, 1000);
+
+   // Passive listener to avoid violation warnings from YouTube base.js
+   document.addEventListener(
+      "timeupdate",
+      () => {
+         if (!cachedIsAdPlaying) checkLoop();
+      },
+      { capture: true, passive: true },
+   );
+   document.addEventListener("yt-navigate-finish", () => {
+      setTimeout(() => {
+         enforceSpeed();
+         initObservers(); // Re-bind if player DOM replaced
+      }, 500);
+   });
+
+   loadSettings();
+
+   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      const video = getVideo();
+      let needSave = false;
+
+      switch (request.action) {
+         case "SET_SPEED":
+            state.targetSpeed = parseFloat(request.speed);
+            if (!state.isAdSpeeding && !state.isKeyBoosting) enforceSpeed();
+            needSave = true;
+            sendResponse({ success: true, speed: state.targetSpeed });
+            break;
+         case "TOGGLE_AUTO_SKIP":
+            state.isAutoSkipEnabled = request.enabled;
+            needSave = true;
+            sendResponse({ success: true });
+            break;
+         case "TOGGLE_SPEED_ADS":
+            state.isSpeedAdEnabled = request.enabled;
+            needSave = true;
+            sendResponse({ success: true });
+            break;
+         case "TOGGLE_ZEN_MODE":
+            toggleZenMode(request.enabled);
+            needSave = true;
+            sendResponse({ success: true });
+            break;
+         case "TOGGLE_BOOSTER":
+            state.isBoosterEnabled = request.enabled;
+            needSave = true;
+            sendResponse({ success: true });
+            break;
+         case "SET_VOLUME":
+            setVolume(parseFloat(request.value));
+            needSave = true;
+            sendResponse({ success: true });
+            break;
+         // NEW HANDLERS
+         case "SET_BOOST_KEY":
+            state.boostKey = request.key;
+            chrome.storage.local.set({ boostKey: state.boostKey }); // Auto save immediately
+            sendResponse({ success: true });
+            break;
+         case "SET_BOOST_SPEED":
+            state.boostSpeed = parseFloat(request.speed);
+            chrome.storage.local.set({ boostSpeed: state.boostSpeed }); // Auto save
+            sendResponse({ success: true });
+            break;
+         case "SET_LOOP_POINT":
+            if (!video) return;
+            if (request.point === "start") {
+               state.loop.start = video.currentTime;
+               if (state.loop.end !== null && state.loop.end < state.loop.start) state.loop.end = null;
+            } else if (request.point === "end") {
+               state.loop.end = video.currentTime;
+               if (state.loop.start === null) state.loop.start = 0;
+               if (state.loop.end !== null && state.loop.end > state.loop.start) {
+                  state.loop.active = true;
+                  video.currentTime = state.loop.start;
                }
-            } else {
-               state.activeCategories = state.activeCategories.filter((c) => c !== request.category);
             }
+            sendResponse({ success: true, loop: state.loop });
+            break;
+         case "CLEAR_LOOP":
+            state.loop.active = false;
+            state.loop.start = null;
+            state.loop.end = null;
+            sendResponse({ success: true, loop: state.loop });
+            break;
+
+         // KEYWORD HANDLERS
+         case "TOGGLE_FOCUS_MODE":
+            state.isFocusModeEnabled = request.enabled;
+            if (state.isFocusModeEnabled) {
+               runFocusFilter();
+            } else {
+               // Optional: Un-hide everything? A reload is cleaner, but we can try to unhide.
+               // For now, reload is easiest for "Show All" or just future items won't be blocked.
+               location.reload();
+            }
+            needSave = true;
+            sendResponse({ success: true });
+            break;
+         case "TOGGLE_STRICT_MODE":
+            state.isStrictModeEnabled = request.enabled;
+            // Rerun filter to update styles
+            document.querySelectorAll("[data-yqs-filtered='true']").forEach((el) => {
+               // Reset state and re-process
+               el.style.visibility = "";
+               const blocker = el.querySelector(".yqs-content-blocker");
+               if (blocker) blocker.remove();
+               delete el.dataset.yqsFiltered;
+            });
             runFocusFilter();
             needSave = true;
-         }
-         sendResponse({ success: true, activeCategories: state.activeCategories });
-         break;
-
-      case "ADD_CATEGORY":
-         if (request.category && request.category.id) {
-            const exists = state.customCategories.find((c) => c.id === request.category.id);
-            if (!exists) {
-               state.customCategories.push(request.category);
+            sendResponse({ success: true });
+            break;
+         case "ADD_KEYWORD":
+            if (request.word && !state.focusKeywords.includes(request.word)) {
+               state.focusKeywords.push(request.word);
+               runFocusFilter();
                needSave = true;
             }
-         }
-         sendResponse({ success: true, customCategories: state.customCategories });
-         break;
-
-      case "DELETE_CATEGORY":
-         if (request.id) {
-            state.customCategories = state.customCategories.filter((c) => c.id !== request.id);
-            // Also remove from active
-            state.activeCategories = state.activeCategories.filter((c) => c !== request.id);
+            sendResponse({ success: true, keywords: state.focusKeywords });
+            break;
+         case "REMOVE_KEYWORD":
+            state.focusKeywords = state.focusKeywords.filter((k) => k !== request.word);
+            // Rerun logic might be creating false negatives if we don't un-hide.
+            // Simpler to reload or just let the user know changes apply on new content/reload.
+            // Actually, let's just save.
             needSave = true;
-         }
-         sendResponse({ success: true, customCategories: state.customCategories });
-         break;
+            sendResponse({ success: true, keywords: state.focusKeywords });
+            break;
 
-      case "TOGGLE_MIRROR":
-         toggleMirror(request.enabled);
-         needSave = true;
-         sendResponse({ success: true, isMirrored: state.isMirrored });
-         break;
+         case "TOGGLE_CATEGORY":
+            if (request.category) {
+               if (request.enabled) {
+                  if (!state.activeCategories.includes(request.category)) {
+                     state.activeCategories.push(request.category);
+                  }
+               } else {
+                  state.activeCategories = state.activeCategories.filter((c) => c !== request.category);
+               }
+               runFocusFilter();
+               needSave = true;
+            }
+            sendResponse({ success: true, activeCategories: state.activeCategories });
+            break;
 
-      case "TAKE_SNAPSHOT":
-         takeSnapshot();
-         sendResponse({ success: true });
-         break;
+         case "ADD_CATEGORY":
+            if (request.category && request.category.id) {
+               const exists = state.customCategories.find((c) => c.id === request.category.id);
+               if (!exists) {
+                  state.customCategories.push(request.category);
+                  needSave = true;
+               }
+            }
+            sendResponse({ success: true, customCategories: state.customCategories });
+            break;
 
-      case "GET_STATE":
-         let currentSpeed = state.targetSpeed;
-         if (video) {
-            if (state.isAdSpeeding) currentSpeed = 16.0;
-            else if (state.isKeyBoosting) currentSpeed = BOOST_SPEED || state.boostSpeed;
-            else currentSpeed = video.playbackRate;
-         }
-         sendResponse({
-            speed: state.targetSpeed,
-            autoSkip: state.isAutoSkipEnabled,
-            speedAds: state.isSpeedAdEnabled,
-            zenMode: state.isZenModeEnabled,
-            booster: state.isBoosterEnabled,
-            boostSpeed: state.boostSpeed,
-            volume: state.volume,
-            isMirrored: state.isMirrored,
-            // Focus Response
-            focusMode: state.isFocusModeEnabled,
-            strictMode: state.isStrictModeEnabled,
-            keywords: state.focusKeywords,
-            activeCategories: state.activeCategories,
-            customCategories: state.customCategories,
+         case "DELETE_CATEGORY":
+            if (request.id) {
+               state.customCategories = state.customCategories.filter((c) => c.id !== request.id);
+               // Also remove from active
+               state.activeCategories = state.activeCategories.filter((c) => c !== request.id);
+               needSave = true;
+            }
+            sendResponse({ success: true, customCategories: state.customCategories });
+            break;
 
-            currentTime: video ? video.currentTime : 0,
-         });
-         break;
-   }
-   if (needSave) saveSettings();
-   return true;
-});
+         case "TOGGLE_MIRROR":
+            toggleMirror(request.enabled);
+            needSave = true;
+            sendResponse({ success: true, isMirrored: state.isMirrored });
+            break;
+
+         case "TAKE_SNAPSHOT":
+            takeSnapshot();
+            sendResponse({ success: true });
+            break;
+
+         case "GET_STATE":
+            let currentSpeed = state.targetSpeed;
+            if (video) {
+               if (state.isAdSpeeding) currentSpeed = 16.0;
+               else if (state.isKeyBoosting) currentSpeed = BOOST_SPEED || state.boostSpeed;
+               else currentSpeed = video.playbackRate;
+            }
+            sendResponse({
+               speed: state.targetSpeed,
+               autoSkip: state.isAutoSkipEnabled,
+               speedAds: state.isSpeedAdEnabled,
+               zenMode: state.isZenModeEnabled,
+               booster: state.isBoosterEnabled,
+               boostSpeed: state.boostSpeed,
+               volume: state.volume,
+               isMirrored: state.isMirrored,
+               // Focus Response
+               focusMode: state.isFocusModeEnabled,
+               strictMode: state.isStrictModeEnabled,
+               keywords: state.focusKeywords,
+               activeCategories: state.activeCategories,
+               customCategories: state.customCategories,
+
+               currentTime: video ? video.currentTime : 0,
+            });
+            break;
+      }
+      if (needSave) saveSettings();
+      return true;
+   });
+} // End of YouTube-only code
 
 console.log("[SpeedController] Loaded (v9.3 - Focus Filter Enabled)");

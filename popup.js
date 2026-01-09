@@ -41,6 +41,15 @@ document.addEventListener("DOMContentLoaded", () => {
       newCatKeywords: document.getElementById("new-cat-keywords"),
       iconPicker: document.getElementById("icon-picker"),
       categoryGrid: document.querySelector(".category-grid"),
+
+      // AD BLOCKER TAB
+      statSession: document.getElementById("stat-session"),
+      statTotal: document.getElementById("stat-total"),
+      btnToggleSite: document.getElementById("btn-toggle-site"),
+      toggleSiteText: document.getElementById("toggle-site-text"),
+      btnResetStats: document.getElementById("btn-reset-stats"),
+      whitelistContainer: document.getElementById("whitelist-container"),
+      whitelistCount: document.getElementById("whitelist-count"),
    };
 
    // Nav Items
@@ -50,6 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
       "view-tools": document.getElementById("view-tools"),
       "view-settings": document.getElementById("view-settings"),
       "view-focus": document.getElementById("view-focus"),
+      "view-adblocker": document.getElementById("view-adblocker"),
    };
 
    // Helper: Switch Tabs
@@ -500,6 +510,214 @@ document.addEventListener("DOMContentLoaded", () => {
    elements.displayBadge.addEventListener("click", () => {
       if (elements.displayBadge.classList.contains("clickable")) {
          chrome.tabs.create({ url: "https://youtube.com" });
+      }
+   });
+
+   // ========================================
+   // AD BLOCKER TAB FUNCTIONALITY
+   // ========================================
+
+   // Load Ad Blocker Stats
+   async function loadAdBlockerStats() {
+      try {
+         const response = await chrome.runtime.sendMessage({ action: "GET_STATS" });
+         if (response && elements.statSession && elements.statTotal) {
+            elements.statSession.textContent = response.sessionBlocked || 0;
+            elements.statTotal.textContent = response.totalBlocked || 0;
+         }
+      } catch (e) {
+         // Service worker might be inactive - show defaults
+         console.warn("[AdBlocker] Service worker not ready, using defaults");
+         if (elements.statSession && elements.statTotal) {
+            elements.statSession.textContent = "0";
+            elements.statTotal.textContent = "0";
+         }
+      }
+   }
+
+   // Load Whitelist
+   async function loadWhitelist() {
+      try {
+         const response = await chrome.runtime.sendMessage({ action: "GET_WHITELIST" });
+         const whitelist = response?.whitelist || [];
+
+         if (elements.whitelistContainer) {
+            if (whitelist.length === 0) {
+               elements.whitelistContainer.innerHTML = '<div class="empty-state">No whitelisted sites</div>';
+            } else {
+               elements.whitelistContainer.innerHTML = whitelist
+                  .map(
+                     (hostname) => `
+                  <div class="whitelist-item">
+                     <span class="whitelist-item-domain">${hostname}</span>
+                     <button class="whitelist-item-remove" data-hostname="${hostname}">Remove</button>
+                  </div>
+               `,
+                  )
+                  .join("");
+
+               // Add remove listeners
+               document.querySelectorAll(".whitelist-item-remove").forEach((btn) => {
+                  btn.addEventListener("click", async () => {
+                     const hostname = btn.dataset.hostname;
+                     await chrome.runtime.sendMessage({
+                        action: "REMOVE_FROM_WHITELIST",
+                        hostname,
+                     });
+                     await loadWhitelist();
+                     await updateToggleButton();
+                  });
+               });
+            }
+         }
+
+         if (elements.whitelistCount) {
+            elements.whitelistCount.textContent = whitelist.length;
+         }
+      } catch (e) {
+         // Service worker might be inactive - show empty state
+         console.warn("[AdBlocker] Service worker not ready for whitelist");
+         if (elements.whitelistContainer) {
+            elements.whitelistContainer.innerHTML = '<div class="empty-state">No whitelisted sites</div>';
+         }
+         if (elements.whitelistCount) {
+            elements.whitelistCount.textContent = "0";
+         }
+      }
+   }
+
+   // Update Toggle Button Text
+   async function updateToggleButton() {
+      try {
+         const tab = await getActiveTab();
+         if (!tab || !tab.url) return;
+
+         // Check if it's an internal page
+         const url = new URL(tab.url);
+         const isInternalPage = url.protocol === "chrome:" || url.protocol === "about:" || url.protocol === "chrome-extension:";
+
+         if (isInternalPage) {
+            // Disable button for internal pages
+            if (elements.toggleSiteText) {
+               elements.toggleSiteText.textContent = "Not Available";
+            }
+            if (elements.btnToggleSite) {
+               elements.btnToggleSite.disabled = true;
+               elements.btnToggleSite.style.opacity = "0.5";
+               elements.btnToggleSite.style.cursor = "not-allowed";
+            }
+            return;
+         }
+
+         // Re-enable button for normal pages
+         if (elements.btnToggleSite) {
+            elements.btnToggleSite.disabled = false;
+            elements.btnToggleSite.style.opacity = "1";
+            elements.btnToggleSite.style.cursor = "pointer";
+         }
+
+         const response = await chrome.runtime.sendMessage({
+            action: "IS_WHITELISTED",
+            url: tab.url,
+         });
+
+         if (elements.toggleSiteText) {
+            if (response?.isWhitelisted) {
+               elements.toggleSiteText.textContent = "Enable on This Site";
+               if (elements.btnToggleSite) {
+                  elements.btnToggleSite.classList.add("secondary");
+               }
+            } else {
+               elements.toggleSiteText.textContent = "Disable on This Site";
+               if (elements.btnToggleSite) {
+                  elements.btnToggleSite.classList.remove("secondary");
+               }
+            }
+         }
+      } catch (e) {
+         console.error("Error updating toggle button:", e);
+      }
+   }
+
+   // Toggle Site Whitelist
+   if (elements.btnToggleSite) {
+      elements.btnToggleSite.addEventListener("click", async () => {
+         try {
+            const tab = await getActiveTab();
+            if (!tab || !tab.url) return;
+
+            const hostname = new URL(tab.url).hostname;
+
+            // Check if whitelisted
+            const response = await chrome.runtime.sendMessage({
+               action: "IS_WHITELISTED",
+               url: tab.url,
+            });
+
+            if (response?.isWhitelisted) {
+               // Remove from whitelist
+               await chrome.runtime.sendMessage({
+                  action: "REMOVE_FROM_WHITELIST",
+                  hostname,
+               });
+            } else {
+               // Add to whitelist
+               await chrome.runtime.sendMessage({
+                  action: "ADD_TO_WHITELIST",
+                  hostname,
+               });
+            }
+
+            // Update UI
+            await updateToggleButton();
+            await loadWhitelist();
+
+            // Show feedback
+            const originalText = elements.toggleSiteText.textContent;
+            elements.toggleSiteText.textContent = "✓ Updated!";
+            setTimeout(() => {
+               updateToggleButton();
+            }, 1000);
+         } catch (e) {
+            console.error("Error toggling whitelist:", e);
+         }
+      });
+   }
+
+   // Reset Statistics
+   if (elements.btnResetStats) {
+      elements.btnResetStats.addEventListener("click", async () => {
+         if (confirm("Reset all ad blocking statistics?")) {
+            try {
+               await chrome.runtime.sendMessage({ action: "RESET_STATS" });
+
+               // Update UI
+               if (elements.statSession) elements.statSession.textContent = "0";
+               if (elements.statTotal) elements.statTotal.textContent = "0";
+
+               // Show feedback
+               const btn = elements.btnResetStats;
+               const originalHTML = btn.innerHTML;
+               btn.innerHTML = "<span>✓ Reset!</span>";
+               setTimeout(() => {
+                  btn.innerHTML = originalHTML;
+               }, 1500);
+            } catch (e) {
+               console.error("Error resetting stats:", e);
+            }
+         }
+      });
+   }
+
+   // Initialize Ad Blocker Tab on popup open
+   loadAdBlockerStats();
+   loadWhitelist();
+   updateToggleButton();
+
+   // Listen for stats updates (optional - for real-time updates)
+   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.action === "STATS_UPDATED") {
+         loadAdBlockerStats();
       }
    });
 });
