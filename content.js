@@ -26,12 +26,11 @@ const detectCurrentSite = () => {
 // Universal Element Hiding - COMPREHENSIVE
 const hideUniversalAds = (removeCompletely = true) => {
    const selectors = [
-      // Generic ad containers
+      // Generic ad containers (specific patterns only)
       '[class*="ad-container"]',
       '[class*="ad-wrapper"]',
       '[class*="ad-banner"]',
       '[class*="advertisement"]',
-      '[class*="advert"]',
       '[id*="ad-container"]',
       '[id*="ad-wrapper"]',
       '[id*="google_ads"]',
@@ -39,13 +38,10 @@ const hideUniversalAds = (removeCompletely = true) => {
       '[id*="ad-slot"]',
       '[id*="adslot"]',
 
-      // Common ad classes
-      ".ad",
-      ".ads",
-      ".advert",
+      // Common ad classes (more specific)
       ".advertisement",
-      ".sponsored",
-      ".sponsor",
+      ".sponsored-content",
+      ".sponsor-content",
       ".ad-banner",
       ".ad-box",
       ".ad-frame",
@@ -86,17 +82,13 @@ const hideUniversalAds = (removeCompletely = true) => {
       "[data-google-container-id]",
       "[data-ad-client]",
 
-      // Image ads (GIF, PNG, JPG)
-      'img[src*="/ad"]',
+      // Image ads (GIF, PNG, JPG) - more specific paths
+      'img[src*="/ad/"]',
       'img[src*="/ads/"]',
       'img[src*="banner"]',
-      'img[src*="advert"]',
       'img[src*="_ad."]',
       'img[src*="-ad."]',
-      'img[src*="/ad."]',
-      'img[src*="/ads."]',
       'img[alt*="advertisement"]',
-      'img[alt*="sponsor"]',
 
       // AdBlock Tester specific
       'img[src*="d31qbv1cthcecs.cloudfront.net"]',
@@ -136,8 +128,8 @@ const hideUniversalAds = (removeCompletely = true) => {
       'iframe[src*="popunder"]', // Popunder iframes
       'iframe[src*="popup"]', // Popup iframes
 
-      // Generic popup containers
-      '[id*="popup" i]:not(#page):not(#content)', // Popup IDs
+      // Generic popup containers (more specific)
+      '[id*="popup" i][id*="ad" i]', // Popup + ad IDs
       '[class*="popup" i][class*="ad" i]', // Popup + ad classes
       '[class*="overlay" i][class*="ad" i]', // Overlay + ad classes
       '[class*="modal" i][class*="ad" i]', // Modal + ad classes
@@ -245,8 +237,23 @@ console.log(`[Universal Ad Blocker] Detected site: ${currentSite.type} (${curren
 const isInternalPage =
    window.location.protocol === "chrome:" || window.location.protocol === "about:" || window.location.protocol === "chrome-extension:";
 
+// Skip ad blocking on Google productivity apps (Gmail, Drive, Docs, etc.)
+const isGoogleApp =
+   currentSite.hostname.includes("mail.google.com") ||
+   currentSite.hostname.includes("drive.google.com") ||
+   currentSite.hostname.includes("docs.google.com") ||
+   currentSite.hostname.includes("sheets.google.com") ||
+   currentSite.hostname.includes("slides.google.com") ||
+   currentSite.hostname.includes("calendar.google.com") ||
+   currentSite.hostname.includes("meet.google.com") ||
+   currentSite.hostname.includes("chat.google.com") ||
+   currentSite.hostname.includes("keep.google.com") ||
+   currentSite.hostname.includes("photos.google.com");
+
 if (isInternalPage) {
    console.log("[Universal Ad Blocker] Skipping internal browser page");
+} else if (isGoogleApp) {
+   console.log("[Universal Ad Blocker] Skipping Google productivity app");
 } else if (currentSite.type !== "youtube") {
    // Activate popup & redirect blocking immediately
    blockPopupsAndRedirects();
@@ -1494,5 +1501,75 @@ if (currentSite.type === "youtube") {
       return true;
    });
 } // End of YouTube-only code
+
+// ============================================================================
+// GLOBAL SCREENSHOT HANDLERS (Works on ALL pages)
+// ============================================================================
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+   // Check if ScreenshotUtil is available
+   if (!window.ScreenshotUtil) {
+      console.error("[Screenshot] ScreenshotUtil not loaded");
+      sendResponse({ success: false, error: "Screenshot utility not available" });
+      return false;
+   }
+
+   switch (request.action) {
+      case "CAPTURE_SCREENSHOT":
+         (async () => {
+            try {
+               let dataUrl;
+               if (request.mode === "visible") {
+                  dataUrl = await window.ScreenshotUtil.captureVisible();
+               } else if (request.mode === "full") {
+                  dataUrl = await window.ScreenshotUtil.captureFullPage();
+               }
+               sendResponse({ success: true, dataUrl });
+            } catch (error) {
+               console.error("[Screenshot] Capture error:", error);
+               sendResponse({ success: false, error: error.message });
+            }
+         })();
+         return true; // Keep channel open for async
+
+      case "CONVERT_SCREENSHOT":
+         (async () => {
+            try {
+               const dataUrl = await window.ScreenshotUtil.convertFormat(request.dataUrl, request.format);
+               sendResponse({ success: true, dataUrl });
+            } catch (error) {
+               console.error("[Screenshot] Convert error:", error);
+               sendResponse({ success: false, error: error.message });
+            }
+         })();
+         return true;
+
+      case "COPY_SCREENSHOT":
+         (async () => {
+            try {
+               const success = await window.ScreenshotUtil.copyToClipboard(request.dataUrl);
+               sendResponse({ success });
+            } catch (error) {
+               console.error("[Screenshot] Copy error:", error);
+               sendResponse({ success: false, error: error.message });
+            }
+         })();
+         return true;
+
+      case "PRINT_SCREENSHOT":
+         try {
+            window.ScreenshotUtil.printImage(request.dataUrl);
+            sendResponse({ success: true });
+         } catch (error) {
+            console.error("[Screenshot] Print error:", error);
+            sendResponse({ success: false, error: error.message });
+         }
+         break;
+
+      default:
+         // Not a screenshot action, ignore
+         return false;
+   }
+});
 
 console.log("[SpeedController] Loaded (v9.3 - Focus Filter Enabled)");

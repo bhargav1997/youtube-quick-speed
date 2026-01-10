@@ -99,26 +99,72 @@
                 </div>
             </div>
 
-            <!-- Video Utilities -->
+            <!-- Screenshot Capture -->
             <div class="control-panel">
                 <div class="panel-header">
                     <div class="icon-wrap">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                             <path
-                                d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
-                        </svg>
-                    </div>
-                    <span>Video Util</span>
-                </div>
-                <div class="grid-controls" style="grid-template-columns: 1fr; margin-top:8px;">
-                    <button id="btn-screenshot" class="loop-btn"
-                        style="flex-direction:row; gap:8px; justify-content:center;">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                            <path
                                 d="M12 12m-3.2 0a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z" />
                         </svg>
-                        <span>Take Snapshot</span>
+                    </div>
+                    <span>Screenshot</span>
+                </div>
+
+                <!-- Capture Mode Selection -->
+                <div class="screenshot-modes"
+                    style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px;">
+                    <button class="screenshot-mode-btn active" data-mode="visible">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path
+                                d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                        </svg>
+                        <span>Visible Area</span>
                     </button>
+                    <button class="screenshot-mode-btn" data-mode="full">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path
+                                d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z" />
+                        </svg>
+                        <span>Full Page</span>
+                    </button>
+                </div>
+
+                <!-- Capture Button -->
+                <button id="btn-capture" class="primary-btn full-width" style="margin-top: 12px;">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <path
+                            d="M12 12m-3.2 0a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z" />
+                    </svg>
+                    <span>Capture Screenshot</span>
+                </button>
+
+                <!-- Export Options (Hidden by default) -->
+                <div id="screenshot-export" style="display: none; margin-top: 12px;">
+                    <div class="section-title" style="font-size: 11px; margin-bottom: 8px; opacity: 0.7;">Export As
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px;">
+                        <button class="export-format-btn" data-format="png">PNG</button>
+                        <button class="export-format-btn" data-format="jpeg">JPEG</button>
+                        <button class="export-format-btn" data-format="gif">GIF</button>
+                        <button class="export-format-btn" data-format="bmp">BMP</button>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                        <button id="btn-copy-clipboard" class="secondary-btn">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                <path
+                                    d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
+                            </svg>
+                            Copy
+                        </button>
+                        <button id="btn-print" class="secondary-btn">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                <path
+                                    d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z" />
+                            </svg>
+                            Print
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

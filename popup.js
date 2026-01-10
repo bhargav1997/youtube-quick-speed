@@ -720,4 +720,235 @@ document.addEventListener("DOMContentLoaded", () => {
          loadAdBlockerStats();
       }
    });
+
+   // ========================================
+   // SCREENSHOT FUNCTIONALITY
+   // ========================================
+
+   let currentScreenshotMode = "visible";
+   let capturedImageData = null;
+
+   // Screenshot Elements
+   const screenshotElements = {
+      modeButtons: document.querySelectorAll(".screenshot-mode-btn"),
+      captureBtn: document.getElementById("btn-capture"),
+      exportPanel: document.getElementById("screenshot-export"),
+      formatButtons: document.querySelectorAll(".export-format-btn"),
+      copyBtn: document.getElementById("btn-copy-clipboard"),
+      printBtn: document.getElementById("btn-print"),
+   };
+
+   // Mode Selection
+   screenshotElements.modeButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+         screenshotElements.modeButtons.forEach((b) => b.classList.remove("active"));
+         btn.classList.add("active");
+         currentScreenshotMode = btn.dataset.mode;
+      });
+   });
+
+   // Capture Screenshot
+   if (screenshotElements.captureBtn) {
+      screenshotElements.captureBtn.addEventListener("click", async () => {
+         const btn = screenshotElements.captureBtn;
+         const originalHTML = btn.innerHTML;
+
+         try {
+            // Show loading state
+            btn.classList.add("loading");
+            btn.innerHTML = "<span>Capturing...</span>";
+
+            const tab = await getActiveTab();
+            if (!tab || !tab.id) {
+               throw new Error("No active tab");
+            }
+
+            // Send capture request to content script
+            const response = await new Promise((resolve) => {
+               chrome.tabs.sendMessage(
+                  tab.id,
+                  {
+                     action: "CAPTURE_SCREENSHOT",
+                     mode: currentScreenshotMode,
+                  },
+                  (response) => {
+                     if (chrome.runtime.lastError) {
+                        resolve(null);
+                     } else {
+                        resolve(response);
+                     }
+                  },
+               );
+            });
+
+            if (response && response.dataUrl) {
+               capturedImageData = response.dataUrl;
+               screenshotElements.exportPanel.style.display = "block";
+               btn.innerHTML =
+                  '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span>Captured!</span>';
+               setTimeout(() => {
+                  btn.innerHTML = originalHTML;
+                  btn.classList.remove("loading");
+               }, 1500);
+            } else {
+               // More specific error message
+               const errorMsg = response?.error || "Reload page first";
+               console.error("Screenshot failed:", errorMsg);
+
+               // Show helpful message if it's likely a reload issue
+               if (!response || errorMsg.includes("not available") || errorMsg.includes("Reload")) {
+                  btn.innerHTML = '<span style="font-size: 11px;">↻ Reload Page</span>';
+                  btn.style.cursor = "pointer";
+                  btn.onclick = () => {
+                     chrome.tabs.reload(tab.id);
+                     setTimeout(() => {
+                        btn.innerHTML = originalHTML;
+                        btn.style.cursor = "";
+                        btn.onclick = null;
+                     }, 1000);
+                  };
+                  setTimeout(() => {
+                     if (btn.onclick) {
+                        btn.innerHTML = originalHTML;
+                        btn.style.cursor = "";
+                        btn.onclick = null;
+                     }
+                  }, 5000);
+                  return;
+               }
+
+               throw new Error(errorMsg);
+            }
+         } catch (error) {
+            console.error("Screenshot error:", error);
+            btn.innerHTML = `<span>❌ ${error.message || "Failed"}</span>`;
+            btn.classList.remove("loading");
+            setTimeout(() => {
+               btn.innerHTML = originalHTML;
+            }, 2500);
+         }
+      });
+   }
+
+   // Export Format Buttons
+   screenshotElements.formatButtons.forEach((btn) => {
+      btn.addEventListener("click", async () => {
+         if (!capturedImageData) return;
+
+         const format = btn.dataset.format;
+         const tab = await getActiveTab();
+
+         try {
+            // Send conversion request
+            const response = await new Promise((resolve) => {
+               chrome.tabs.sendMessage(
+                  tab.id,
+                  {
+                     action: "CONVERT_SCREENSHOT",
+                     dataUrl: capturedImageData,
+                     format: format,
+                  },
+                  (response) => {
+                     if (chrome.runtime.lastError) {
+                        resolve(null);
+                     } else {
+                        resolve(response);
+                     }
+                  },
+               );
+            });
+
+            if (response && response.dataUrl) {
+               // Download
+               const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+               const filename = `screenshot_${timestamp}.${format}`;
+
+               const link = document.createElement("a");
+               link.href = response.dataUrl;
+               link.download = filename;
+               link.click();
+
+               // Visual feedback
+               const originalText = btn.textContent;
+               btn.textContent = "✓";
+               setTimeout(() => {
+                  btn.textContent = originalText;
+               }, 1000);
+            }
+         } catch (error) {
+            console.error("Export error:", error);
+         }
+      });
+   });
+
+   // Copy to Clipboard
+   if (screenshotElements.copyBtn) {
+      screenshotElements.copyBtn.addEventListener("click", async () => {
+         if (!capturedImageData) return;
+
+         const originalHTML = screenshotElements.copyBtn.innerHTML;
+
+         try {
+            // Copy directly in popup (where document is focused)
+            // Method 1: Try copying as image blob
+            try {
+               const blob = await (await fetch(capturedImageData)).blob();
+               await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+
+               screenshotElements.copyBtn.innerHTML =
+                  '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Copied!';
+               setTimeout(() => {
+                  screenshotElements.copyBtn.innerHTML = originalHTML;
+               }, 2000);
+               return;
+            } catch (e) {
+               console.warn("Image copy failed, trying text:", e.message);
+            }
+
+            // Method 2: Try copying as text (fallback)
+            try {
+               await navigator.clipboard.writeText(capturedImageData);
+
+               screenshotElements.copyBtn.innerHTML =
+                  '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Copied!';
+               setTimeout(() => {
+                  screenshotElements.copyBtn.innerHTML = originalHTML;
+               }, 2000);
+               return;
+            } catch (e2) {
+               console.error("Text copy also failed:", e2.message);
+            }
+
+            // Both methods failed
+            screenshotElements.copyBtn.innerHTML = '<span style="font-size: 10px;">Use PNG/JPEG</span>';
+            setTimeout(() => {
+               screenshotElements.copyBtn.innerHTML = originalHTML;
+            }, 3000);
+         } catch (error) {
+            console.error("Copy error:", error);
+            screenshotElements.copyBtn.innerHTML = '<span style="font-size: 10px;">Use PNG/JPEG</span>';
+            setTimeout(() => {
+               screenshotElements.copyBtn.innerHTML = originalHTML;
+            }, 3000);
+         }
+      });
+   }
+
+   // Print
+   if (screenshotElements.printBtn) {
+      screenshotElements.printBtn.addEventListener("click", async () => {
+         if (!capturedImageData) return;
+
+         const tab = await getActiveTab();
+
+         try {
+            chrome.tabs.sendMessage(tab.id, {
+               action: "PRINT_SCREENSHOT",
+               dataUrl: capturedImageData,
+            });
+         } catch (error) {
+            console.error("Print error:", error);
+         }
+      });
+   }
 });

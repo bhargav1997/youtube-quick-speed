@@ -325,6 +325,18 @@ const handleMessage = async (request, sender) => {
          incrementStats(request.domain || "unknown", request.type || "element");
          return { success: true };
 
+      case "CAPTURE_VISIBLE_TAB":
+         // Capture visible tab for screenshots
+         try {
+            const dataUrl = await chrome.tabs.captureVisibleTab(null, {
+               format: "png",
+               quality: 100,
+            });
+            return { success: true, dataUrl };
+         } catch (error) {
+            return { success: false, error: error.message };
+         }
+
       default:
          return { success: false, error: "Unknown action" };
    }
