@@ -1120,4 +1120,202 @@ document.addEventListener("DOMContentLoaded", () => {
          loadThumbnailPreview();
       }, 500);
    }
+
+   // ============================================================================
+   // CUSTOM SPEED PRESETS
+   // ============================================================================
+
+   const presetElements = {
+      addBtn: document.getElementById("btn-add-preset"),
+      modal: document.getElementById("preset-modal"),
+      closeBtn: document.getElementById("close-preset-modal"),
+      saveBtn: document.getElementById("save-preset-btn"),
+      nameInput: document.getElementById("preset-name-input"),
+      speedInput: document.getElementById("preset-speed-input"),
+      presetsList: document.getElementById("presets-list"),
+      emojiButtons: document.querySelectorAll(".emoji-btn"),
+   };
+
+   let selectedEmoji = "⚡";
+   let presets = [];
+
+   // Load presets from storage
+   async function loadPresets() {
+      const result = await chrome.storage.local.get(["speedPresets"]);
+      presets = result.speedPresets || [];
+      renderPresets();
+   }
+
+   // Save presets to storage
+   async function savePresets() {
+      await chrome.storage.local.set({ speedPresets: presets });
+   }
+
+   // Render presets list
+   function renderPresets() {
+      if (presets.length === 0) {
+         presetElements.presetsList.innerHTML = `
+            <div class="empty-state" style="text-align: center; padding: 20px; color: var(--text-secondary); font-size: 11px;">
+               No presets yet. Click + to add one!
+            </div>
+         `;
+         return;
+      }
+
+      presetElements.presetsList.innerHTML = presets
+         .map(
+            (preset, index) => `
+         <div class="preset-item" data-index="${index}">
+            <div class="preset-info">
+               <span class="preset-emoji">${preset.emoji}</span>
+               <span class="preset-name">${preset.name}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+               <span class="preset-speed">${preset.speed}x</span>
+               <button class="preset-delete" data-index="${index}">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                     <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                  </svg>
+               </button>
+            </div>
+         </div>
+      `,
+         )
+         .join("");
+
+      // Add click handlers
+      document.querySelectorAll(".preset-item").forEach((item) => {
+         item.addEventListener("click", (e) => {
+            if (!e.target.closest(".preset-delete")) {
+               const index = parseInt(item.dataset.index);
+               applyPreset(presets[index]);
+            }
+         });
+      });
+
+      // Add delete handlers
+      document.querySelectorAll(".preset-delete").forEach((btn) => {
+         btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const index = parseInt(btn.dataset.index);
+            deletePreset(index);
+         });
+      });
+   }
+
+   // Apply preset speed
+   async function applyPreset(preset) {
+      const tab = await getActiveTab();
+      chrome.tabs.sendMessage(tab.id, {
+         action: "SET_SPEED",
+         speed: preset.speed,
+      });
+
+      // Update UI
+      elements.displayBadge.textContent = `${preset.speed}x`;
+
+      // Visual feedback
+      const presetItem = document.querySelector(`[data-index]`);
+      if (presetItem) {
+         presetItem.style.transform = "scale(0.95)";
+         setTimeout(() => {
+            presetItem.style.transform = "";
+         }, 200);
+      }
+   }
+
+   // Delete preset
+   function deletePreset(index) {
+      presets.splice(index, 1);
+      savePresets();
+      renderPresets();
+   }
+
+   // Open modal
+   if (presetElements.addBtn) {
+      presetElements.addBtn.addEventListener("click", () => {
+         presetElements.modal.style.display = "flex";
+         presetElements.nameInput.value = "";
+         presetElements.speedInput.value = "1.5";
+         selectedEmoji = "⚡";
+         presetElements.emojiButtons.forEach((btn) => btn.classList.remove("selected"));
+      });
+   }
+
+   // Close modal
+   if (presetElements.closeBtn) {
+      presetElements.closeBtn.addEventListener("click", () => {
+         presetElements.modal.style.display = "none";
+      });
+   }
+
+   // Close modal on outside click
+   if (presetElements.modal) {
+      presetElements.modal.addEventListener("click", (e) => {
+         if (e.target === presetElements.modal) {
+            presetElements.modal.style.display = "none";
+         }
+      });
+   }
+
+   // Emoji selection
+   if (presetElements.emojiButtons) {
+      presetElements.emojiButtons.forEach((btn) => {
+         btn.addEventListener("click", () => {
+            presetElements.emojiButtons.forEach((b) => b.classList.remove("selected"));
+            btn.classList.add("selected");
+            selectedEmoji = btn.dataset.emoji;
+         });
+      });
+   }
+
+   // Save preset
+   if (presetElements.saveBtn) {
+      presetElements.saveBtn.addEventListener("click", () => {
+         const name = presetElements.nameInput.value.trim();
+         const speed = parseFloat(presetElements.speedInput.value);
+
+         if (!name) {
+            presetElements.nameInput.style.borderColor = "#ff3b30";
+            setTimeout(() => {
+               presetElements.nameInput.style.borderColor = "";
+            }, 1000);
+            return;
+         }
+
+         if (isNaN(speed) || speed < 0.25 || speed > 16) {
+            presetElements.speedInput.style.borderColor = "#ff3b30";
+            setTimeout(() => {
+               presetElements.speedInput.style.borderColor = "";
+            }, 1000);
+            return;
+         }
+
+         // Add preset
+         presets.push({
+            name,
+            speed,
+            emoji: selectedEmoji,
+         });
+
+         savePresets();
+         renderPresets();
+         presetElements.modal.style.display = "none";
+
+         // Visual feedback
+         const originalHTML = presetElements.saveBtn.innerHTML;
+         presetElements.saveBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+               <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            <span>Saved!</span>
+         `;
+         setTimeout(() => {
+            presetElements.saveBtn.innerHTML = originalHTML;
+         }, 1000);
+      });
+   }
+
+   // Load presets on startup
+   loadPresets();
 });
