@@ -951,4 +951,173 @@ document.addEventListener("DOMContentLoaded", () => {
          }
       });
    }
+
+   // ============================================================================
+   // THUMBNAIL DOWNLOADER
+   // ============================================================================
+
+   const thumbnailElements = {
+      qualityBtns: document.querySelectorAll(".thumbnail-quality-btn"),
+      downloadBtn: document.getElementById("btn-download-thumbnail"),
+      preview: document.getElementById("thumbnail-preview"),
+      img: document.getElementById("thumbnail-img"),
+      status: document.getElementById("thumbnail-status"),
+   };
+
+   let selectedQuality = "maxresdefault";
+   let currentVideoId = null;
+
+   // Extract YouTube video ID from URL
+   function getYouTubeVideoId(url) {
+      const patterns = [
+         /youtube\.com\/watch\?v=([^&\n?#]+)/,
+         /youtu\.be\/([^&\n?#]+)/,
+         /youtube\.com\/embed\/([^&\n?#]+)/,
+         /youtube\.com\/v\/([^&\n?#]+)/,
+         /youtube\.com\/shorts\/([^&\n?#]+)/,
+      ];
+
+      for (const pattern of patterns) {
+         const match = url.match(pattern);
+         if (match && match[1]) {
+            return match[1];
+         }
+      }
+      return null;
+   }
+
+   // Get thumbnail URL
+   function getThumbnailUrl(videoId, quality) {
+      return `https://img.youtube.com/vi/${videoId}/${quality}.jpg`;
+   }
+
+   // Show status message
+   function showThumbnailStatus(message, isError = false) {
+      if (thumbnailElements.status) {
+         thumbnailElements.status.textContent = message;
+         thumbnailElements.status.style.display = "block";
+         thumbnailElements.status.style.backgroundColor = isError ? "rgba(255, 59, 48, 0.1)" : "rgba(52, 199, 89, 0.1)";
+         thumbnailElements.status.style.color = isError ? "#ff3b30" : "#34c759";
+
+         setTimeout(() => {
+            thumbnailElements.status.style.display = "none";
+         }, 3000);
+      }
+   }
+
+   // Load and preview thumbnail
+   async function loadThumbnailPreview() {
+      try {
+         await new Promise((r) => setTimeout(r, 300)); // ⬅ allow popup to stabilize
+
+         const [tab] = await chrome.tabs.query({
+            active: true,
+            lastFocusedWindow: true,
+         });
+
+         if (!tab?.url || (!tab.url.includes("youtube.com") && !tab.url.includes("youtu.be"))) {
+            showThumbnailStatus("Open a YouTube video tab", true);
+            return;
+         }
+
+         currentVideoId = getYouTubeVideoId(tab.url);
+
+         if (!currentVideoId) {
+            showThumbnailStatus("Video ID not found", true);
+            return;
+         }
+
+         const thumbnailUrl = getThumbnailUrl(currentVideoId, selectedQuality);
+         thumbnailElements.img.src = thumbnailUrl;
+         thumbnailElements.preview.style.display = "block";
+      } catch (err) {
+         console.error(err);
+         showThumbnailStatus("Failed to detect video", true);
+      }
+   }
+
+   // Quality button selection
+   if (thumbnailElements.qualityBtns) {
+      thumbnailElements.qualityBtns.forEach((btn) => {
+         btn.addEventListener("click", () => {
+            // Update active state
+            thumbnailElements.qualityBtns.forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+
+            // Update selected quality
+            selectedQuality = btn.dataset.quality;
+
+            // Reload preview
+            if (currentVideoId) {
+               loadThumbnailPreview();
+            }
+         });
+      });
+   }
+
+   // Download thumbnail
+   if (thumbnailElements.downloadBtn) {
+      thumbnailElements.downloadBtn.addEventListener("click", async () => {
+         if (!currentVideoId) {
+            showThumbnailStatus("No video detected", true);
+            return;
+         }
+
+         try {
+            const thumbnailUrl = getThumbnailUrl(currentVideoId, selectedQuality);
+
+            // Fetch the image as blob
+            const response = await fetch(thumbnailUrl);
+            const blob = await response.blob();
+
+            // Create download link
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `youtube_thumbnail_${currentVideoId}_${selectedQuality}.jpg`;
+            link.click();
+
+            // Cleanup
+            URL.revokeObjectURL(url);
+
+            // Show success
+            showThumbnailStatus("✓ Thumbnail downloaded!");
+
+            // Visual feedback on button
+            const originalHTML = thumbnailElements.downloadBtn.innerHTML;
+            thumbnailElements.downloadBtn.innerHTML = `
+               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+               </svg>
+               <span>Downloaded!</span>
+            `;
+
+            setTimeout(() => {
+               thumbnailElements.downloadBtn.innerHTML = originalHTML;
+            }, 2000);
+         } catch (error) {
+            console.error("Download error:", error);
+            showThumbnailStatus("Download failed", true);
+         }
+      });
+   }
+
+   // Auto-load thumbnail when Tools tab is opened
+   const toolsTab = document.querySelector('[data-target="view-tools"]');
+
+   if (toolsTab) {
+      toolsTab.addEventListener("click", () => {
+         setTimeout(() => {
+            loadThumbnailPreview();
+         }, 300);
+      });
+   }
+
+   // Initial load if already on Tools tab
+   const viewTools = document.getElementById("view-tools");
+   if (viewTools && viewTools.style.display !== "none") {
+      setTimeout(() => {
+         loadThumbnailPreview();
+      }, 500);
+   }
 });

@@ -966,6 +966,34 @@ body {
    opacity: 1;
 }
 
+/* Thumbnail Quality Buttons */
+.thumbnail-quality-btn {
+   background-color: #2a2a2a;
+   border: 1px solid transparent;
+   border-radius: 8px;
+   padding: 10px 6px;
+   cursor: pointer;
+   transition: all 0.2s ease;
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   gap: 2px;
+   color: var(--text-secondary);
+   font-size: 11px;
+}
+
+.thumbnail-quality-btn:hover {
+   background-color: #333;
+   transform: translateY(-1px);
+}
+
+.thumbnail-quality-btn.active {
+   background-color: rgba(102, 126, 234, 0.15);
+   border-color: #667eea;
+   color: #667eea;
+   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
 /* Primary Capture Button */
 .primary-btn {
    background: var(--primary-color);

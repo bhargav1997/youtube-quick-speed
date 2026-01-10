@@ -167,6 +167,58 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Thumbnail Downloader -->
+            <div class="tool-section" style="margin-top: 20px;">
+                <div class="section-header" style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                    <div class="icon-wrap" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path
+                                d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+                        </svg>
+                    </div>
+                    <span>Thumbnail</span>
+                </div>
+
+                <!-- Thumbnail Preview -->
+                <div id="thumbnail-preview"
+                    style="display: none; margin-bottom: 12px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);">
+                    <img id="thumbnail-img" style="width: 100%; height: auto; display: block;" alt="Video Thumbnail">
+                </div>
+
+                <!-- Quality Selection -->
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;">
+                    <button class="thumbnail-quality-btn active" data-quality="maxresdefault">
+                        <span style="font-weight: 600;">Max Res</span>
+                        <span style="font-size: 10px; opacity: 0.7;">1280×720</span>
+                    </button>
+                    <button class="thumbnail-quality-btn" data-quality="sddefault">
+                        <span style="font-weight: 600;">SD</span>
+                        <span style="font-size: 10px; opacity: 0.7;">640×480</span>
+                    </button>
+                    <button class="thumbnail-quality-btn" data-quality="hqdefault">
+                        <span style="font-weight: 600;">HQ</span>
+                        <span style="font-size: 10px; opacity: 0.7;">480×360</span>
+                    </button>
+                    <button class="thumbnail-quality-btn" data-quality="mqdefault">
+                        <span style="font-weight: 600;">MQ</span>
+                        <span style="font-size: 10px; opacity: 0.7;">320×180</span>
+                    </button>
+                </div>
+
+                <!-- Download Button -->
+                <button id="btn-download-thumbnail" class="primary-btn full-width">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                    </svg>
+                    <span>Download Thumbnail</span>
+                </button>
+
+                <!-- Info Message -->
+                <div id="thumbnail-status"
+                    style="display: none; margin-top: 8px; padding: 8px; border-radius: 6px; font-size: 11px; text-align: center;">
+                </div>
+            </div>
         </div>
 
         <!-- VIEW 3: SETTINGS -->
