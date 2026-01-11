@@ -2,7 +2,7 @@
    "manifest_version": 3,
    "name": "YouTube Quick Speed & Loop Control",
    "version": "2.1.0",
-   "description": "Control YouTube playback speed (up to 16x), block ads universally, boost volume, and enhance your browsing experience. Privacy-focused, no tracking.",
+   "description": "Control YouTube speed (up to 16x), block ads, boost volume & loop videos. Privacy-first, no tracking. Enhance your viewing!",
    "permissions": ["activeTab", "scripting", "storage", "declarativeNetRequest", "declarativeNetRequestFeedback", "clipboardWrite"],
    "host_permissions": ["<all_urls>"],
    "action": {
