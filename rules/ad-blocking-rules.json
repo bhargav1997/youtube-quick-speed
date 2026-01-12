@@ -898,5 +898,851 @@
          "urlFilter": "||revcontent.com^",
          "resourceTypes": ["script", "image", "xmlhttprequest", "sub_frame"]
       }
+   },
+   {
+      "id": 101,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||analyticsengine.s3.amazonaws.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 102,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||adtago.s3.amazonaws.com^",
+         "resourceTypes": ["script", "image", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 103,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||analytics.s3.amazonaws.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 104,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||advice-ads.s3.amazonaws.com^",
+         "resourceTypes": ["script", "image", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 105,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||analytics.google.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 106,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||click.googleanalytics.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 107,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||adm.hotjar.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 108,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||surveys.hotjar.com^",
+         "resourceTypes": ["script", "xmlhttprequest", "sub_frame"]
+      }
+   },
+   {
+      "id": 109,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||insights.hotjar.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 110,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||script.hotjar.com^",
+         "resourceTypes": ["script", "xmlhttprequest", "stylesheet", "font", "image", "media", "sub_frame", "other"]
+      }
+   },
+   {
+      "id": 111,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||identify.hotjar.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 112,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||o2.mouseflow.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 113,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||cdn-test.mouseflow.com^",
+         "resourceTypes": ["script", "xmlhttprequest", "stylesheet", "font", "image", "media", "sub_frame", "other"]
+      }
+   },
+   {
+      "id": 114,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||cdn.mouseflow.com^",
+         "resourceTypes": ["script", "xmlhttprequest", "stylesheet", "font", "image", "media", "sub_frame", "other"]
+      }
+   },
+   {
+      "id": 115,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||tools.mouseflow.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 116,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||fwtracks.freshmarketer.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 117,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||claritybt.freshmarketer.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 118,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||freshmarketer.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 119,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||upload.luckyorange.net^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 120,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||cs.luckyorange.net^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 121,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||realtime.luckyorange.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 122,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||settings.luckyorange.net^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 123,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||api.luckyorange.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 124,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||w1.luckyorange.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 125,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||cdn.luckyorange.com^",
+         "resourceTypes": ["script", "xmlhttprequest", "stylesheet", "font", "image", "media", "sub_frame", "other"]
+      }
+   },
+   {
+      "id": 126,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||stats.wp.com^",
+         "resourceTypes": ["script", "image", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 127,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||browser.sentry-cdn.com^",
+         "resourceTypes": ["script", "xmlhttprequest", "stylesheet", "font", "image", "media", "sub_frame", "other"]
+      }
+   },
+   {
+      "id": 128,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||app.getsentry.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 129,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||an.facebook.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 130,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||pixel.facebook.com^",
+         "resourceTypes": ["script", "image", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 131,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||ads-api.twitter.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 132,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||static.ads-twitter.com^",
+         "resourceTypes": ["script", "xmlhttprequest", "stylesheet", "font", "image", "media", "sub_frame", "other"]
+      }
+   },
+   {
+      "id": 133,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||analytics.pointdrive.linkedin.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 134,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||trk.pinterest.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 135,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||log.pinterest.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 136,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||events.reddit.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 137,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||events.redditmedia.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 138,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||ads.youtube.com^",
+         "resourceTypes": ["script", "image", "xmlhttprequest", "media"]
+      }
+   },
+   {
+      "id": 139,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||analytics.tiktok.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 140,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||ads-api.tiktok.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 141,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||ads.tiktok.com^",
+         "resourceTypes": ["script", "image", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 142,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||analytics-sg.tiktok.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 143,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||business-api.tiktok.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 144,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||log.byteoversea.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 145,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||ads-sg.tiktok.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 146,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||ads.yahoo.com^",
+         "resourceTypes": ["script", "image", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 147,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||log.fc.yahoo.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 148,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||udcm.yahoo.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 149,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||analytics.query.yahoo.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 150,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||partnerads.ysm.yahoo.com^",
+         "resourceTypes": ["script", "image", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 151,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||analytics.yahoo.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 152,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||adtech.yahooinc.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 153,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||appmetrica.yandex.ru^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 154,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||metrika.yandex.ru^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 155,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||adfox.yandex.ru^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 156,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||adfstat.yandex.ru^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 157,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||adserver.unityads.unity3d.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 158,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||auction.unityads.unity3d.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 159,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||config.unityads.unity3d.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 160,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||webview.unityads.unity3d.com^",
+         "resourceTypes": ["script", "xmlhttprequest", "stylesheet", "font", "image", "media", "sub_frame", "other"]
+      }
+   },
+   {
+      "id": 161,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||iot-eu-logser.realme.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 162,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||bdapi-ads.realmemobile.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 163,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||iot-logser.realme.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 164,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||bdapi-in-ads.realmemobile.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 165,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||api.ad.xiaomi.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 166,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||data.mistat.rus.xiaomi.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 167,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||data.mistat.india.xiaomi.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 168,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||tracking.rus.miui.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 169,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||sdkconfig.ad.xiaomi.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 170,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||sdkconfig.ad.intl.xiaomi.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 171,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||data.mistat.xiaomi.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 172,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||adx.ads.oppomobile.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 173,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||data.ads.oppomobile.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 174,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||ck.ads.oppomobile.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 175,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||adsfs.oppomobile.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 176,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||grs.hicloud.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 177,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||metrics2.data.hicloud.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 178,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||logbak.hicloud.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 179,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||logservice.hicloud.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 180,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||logservice1.hicloud.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 181,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||metrics.data.hicloud.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 182,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||samsung-com.112.2o7.net^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 183,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||smetrics.samsung.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 184,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||analytics-api.samsunghealthcn.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 185,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||samsungads.com^",
+         "resourceTypes": ["script", "image", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 186,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||metrics.mzstatic.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 187,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||api-adservices.apple.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 188,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||weather-analytics-events.apple.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 189,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||notes-analytics-events.apple.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 190,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||books-analytics-events.apple.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 191,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||metrics.icloud.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 192,
+      "priority": 1,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||iadsdk.apple.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 193,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||analytics.pinterest.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
+   },
+   {
+      "id": 194,
+      "priority": 2,
+      "action": { "type": "block" },
+      "condition": {
+         "urlFilter": "||udc.yahoo.com^",
+         "resourceTypes": ["script", "xmlhttprequest"]
+      }
    }
 ]
