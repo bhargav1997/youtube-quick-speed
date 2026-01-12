@@ -5,6 +5,30 @@
 // Import utilities (Note: Chrome extensions don't support ES6 imports in content scripts yet)
 // We'll use inline code for now, can refactor to modules later
 
+// Helper to check if extension context is still valid
+const isExtensionContextValid = () => {
+   try {
+      return chrome.runtime && chrome.runtime.id;
+   } catch (e) {
+      return false;
+   }
+};
+
+// Safe message sender that handles context invalidation
+const safeSendMessage = (message) => {
+   if (!isExtensionContextValid()) {
+      console.log("[Extension] Context invalidated, skipping message");
+      return Promise.resolve();
+   }
+
+   return chrome.runtime.sendMessage(message).catch((error) => {
+      // Silently handle context invalidation errors
+      if (error.message?.includes("Extension context invalidated")) {
+         console.log("[Extension] Context invalidated during message send");
+      }
+   });
+};
+
 // Site Detection
 const detectCurrentSite = () => {
    const hostname = window.location.hostname;
@@ -74,8 +98,7 @@ const hideUniversalAds = (removeCompletely = true) => {
       '[width="320"][height="50"]',
       '[width="468"][height="60"]',
 
-      // Data attributes
-      "[data-ad]",
+      // Data attributes - ONLY SPECIFIC ONES (removed generic [data-ad])
       "[data-ad-slot]",
       "[data-ad-unit]",
       "[data-google-query-id]",
@@ -171,7 +194,7 @@ const hideUniversalAds = (removeCompletely = true) => {
 // Check if site is whitelisted
 const checkWhitelist = async () => {
    try {
-      const response = await chrome.runtime.sendMessage({
+      const response = await safeSendMessage({
          action: "IS_WHITELISTED",
          url: window.location.href,
       });
@@ -186,7 +209,6 @@ const blockPopupsAndRedirects = () => {
    // Block window.open (popups)
    const originalOpen = window.open;
    window.open = function (...args) {
-      console.log("[Universal Ad Blocker] Blocked popup attempt:", args[0]);
       return null;
    };
 
@@ -209,7 +231,6 @@ const blockPopupsAndRedirects = () => {
             ) {
                e.preventDefault();
                e.stopPropagation();
-               console.log("[Universal Ad Blocker] Blocked redirect:", url);
                return false;
             }
          }
@@ -225,13 +246,10 @@ const blockPopupsAndRedirects = () => {
       },
       true,
    );
-
-   console.log("[Universal Ad Blocker] Popup & redirect blocking active");
 };
 
 // Initialize Universal Ad Blocking
 const currentSite = detectCurrentSite();
-console.log(`[Universal Ad Blocker] Detected site: ${currentSite.type} (${currentSite.hostname})`);
 
 // Skip ad blocking on chrome:// and about: pages (New Tab, Settings, etc.)
 const isInternalPage =
@@ -250,46 +268,35 @@ const isGoogleApp =
    currentSite.hostname.includes("keep.google.com") ||
    currentSite.hostname.includes("photos.google.com");
 
-if (isInternalPage) {
-   console.log("[Universal Ad Blocker] Skipping internal browser page");
-} else if (isGoogleApp) {
-   console.log("[Universal Ad Blocker] Skipping Google productivity app");
-} else if (currentSite.type !== "youtube") {
+if (currentSite.type !== "youtube") {
    // Activate popup & redirect blocking immediately
    blockPopupsAndRedirects();
 
    // Check whitelist first
    checkWhitelist().then((isWhitelisted) => {
       if (isWhitelisted) {
-         console.log("[Universal Ad Blocker] Site is whitelisted, ad blocking disabled");
          return;
       }
 
       // For non-YouTube sites, run universal ad blocking
       const initialHidden = hideUniversalAds(true); // TRUE = remove completely
       if (initialHidden > 0) {
-         console.log(`[Universal Ad Blocker] Removed ${initialHidden} ad elements`);
-         chrome.runtime
-            .sendMessage({
-               action: "INCREMENT_STATS",
-               domain: currentSite.hostname,
-               type: "element",
-            })
-            .catch(() => {});
+         safeSendMessage({
+            action: "INCREMENT_STATS",
+            domain: currentSite.hostname,
+            type: "element",
+         });
       }
 
       // Watch for new ads with MutationObserver
       const observer = new MutationObserver(() => {
          const newHidden = hideUniversalAds(true); // TRUE = remove completely
          if (newHidden > 0) {
-            console.log(`[Universal Ad Blocker] Removed ${newHidden} dynamically loaded ads`);
-            chrome.runtime
-               .sendMessage({
-                  action: "INCREMENT_STATS",
-                  domain: currentSite.hostname,
-                  type: "element",
-               })
-               .catch(() => {});
+            safeSendMessage({
+               action: "INCREMENT_STATS",
+               domain: currentSite.hostname,
+               type: "element",
+            });
          }
       });
 
@@ -305,14 +312,11 @@ if (isInternalPage) {
       setInterval(() => {
          const scannedHidden = hideUniversalAds(true);
          if (scannedHidden > 0) {
-            console.log(`[Universal Ad Blocker] Continuous scan removed ${scannedHidden} ads`);
-            chrome.runtime
-               .sendMessage({
-                  action: "INCREMENT_STATS",
-                  domain: currentSite.hostname,
-                  type: "element",
-               })
-               .catch(() => {});
+            safeSendMessage({
+               action: "INCREMENT_STATS",
+               domain: currentSite.hostname,
+               type: "element",
+            });
          }
       }, 2000); // Scan every 2 seconds
    });
@@ -811,7 +815,6 @@ if (currentSite.type === "youtube") {
                if (currentVideo && currentVideo.src !== lastSrc) {
                   lastSrc = currentVideo.src;
                   state.adSkipClicked = false; // Reset for Ad 2
-                  // console.log("[SpeedController] Ad Source Changed (Sequential Ad)");
                }
 
                // Gentle Play Enforcement: If ad pauses (buffer/glitch), nudge it
@@ -833,7 +836,6 @@ if (currentSite.type === "youtube") {
          // If skipAd() returns TRUE, it means a button was found and clicked, so we are logically still "In Ad" for the user.
          // We keep the loop alive.
          if (state.isAutoSkipEnabled && skipAd()) {
-            // console.log("[SpeedController] Ad signal away, but Skip Button found. Keeping loop.");
             return;
          }
 
@@ -1571,5 +1573,3 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
          return false;
    }
 });
-
-console.log("[SpeedController] Loaded (v9.3 - Focus Filter Enabled)");

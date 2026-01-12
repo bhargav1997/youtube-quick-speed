@@ -52,7 +52,6 @@
          }
       });
 
-      console.log(`[Screenshot] Hiding ${fixedElements.length} fixed/sticky elements`);
       return fixedElements;
    };
 
@@ -71,7 +70,6 @@
             el.style.position = originalPosition;
          }
       });
-      console.log(`[Screenshot] Restored ${elements.length} fixed/sticky elements`);
    };
 
    const captureFullPage = async () => {
@@ -120,9 +118,6 @@
 
          const ctx = canvas.getContext("2d");
 
-         console.log("[Screenshot] DPR:", pixelRatio);
-         console.log("[Screenshot] CSS Capture Height:", cssCaptureHeight);
-
          let y = 0;
          let shots = 0;
 
@@ -153,8 +148,6 @@
             shots++;
             y += cssCaptureHeight;
          }
-
-         console.log(`[Screenshot] Captured ${shots} slices`);
 
          restoreFixedElements(fixedEls);
          window.scrollTo(originalScrollX, originalScrollY);
@@ -337,19 +330,14 @@
          // Method 1: Copy as image blob (best for pasting into apps)
          const blob = await (await fetch(dataUrl)).blob();
          await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-         console.log("[Screenshot] ✓ Copied to clipboard successfully");
          return true;
       } catch (e) {
-         console.warn("[Screenshot] Image copy failed, trying text fallback:", e.message);
-
          // Method 2: Copy as data URL text (fallback)
          try {
             await navigator.clipboard.writeText(dataUrl);
-            console.log("[Screenshot] ✓ Copied data URL as text");
             return true;
          } catch (e2) {
             console.error("[Screenshot] ✗ Clipboard access denied:", e2.message);
-            console.log("[Screenshot] Tip: Use the download buttons (PNG, JPEG, etc.) instead");
             return false;
          }
       }
@@ -448,5 +436,4 @@
       printImage,
    };
 
-   console.log("[ScreenshotUtil] Loaded successfully ✓");
 })();

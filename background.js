@@ -40,8 +40,6 @@ let isEnabled = true;
 // ============================================================================
 
 const initialize = async () => {
-   console.log("[Universal Ad Blocker] Background service worker initialized");
-
    // Load saved data
    await loadSettings();
    await loadStats();
@@ -235,8 +233,6 @@ const setupRequestListeners = () => {
             const type = details.request.type || "unknown";
 
             incrementStats(domain, type);
-
-            console.log("[Universal Ad Blocker] Blocked:", domain, type);
          } catch (e) {
             console.error("[Universal Ad Blocker] Error processing blocked request:", e);
          }
@@ -372,5 +368,3 @@ setInterval(() => {
 // ============================================================================
 
 initialize();
-
-console.log("[Universal Ad Blocker] Background service worker ready");
