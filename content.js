@@ -328,16 +328,330 @@ if (currentSite.type !== "youtube") {
 
 // Only run YouTube-specific features on YouTube
 if (currentSite.type === "youtube") {
-   // Helper to find the video element
-   const getVideo = () => document.querySelector("video");
+   // Helper to find the video element - using EXACT selectors from Shorts HTML
+   const getVideo = () => {
+      // For Shorts: Look for the exact video element structure
+      let video = document.querySelector("#shorts-player video.html5-main-video");
+
+      // For regular videos
+      if (!video) {
+         video = document.querySelector("#movie_player video.html5-main-video");
+      }
+
+      // Try other Shorts variations
+      if (!video) {
+         video = document.querySelector(".html5-video-player video");
+      }
+
+      // Final fallback
+      if (!video) {
+         video = document.querySelector("video");
+      }
+
+      return video;
+   };
+
+   // AGGRESSIVE Shorts speed enforcement - runs every 100ms
+   let lastEnforcedSpeed = 1.0;
+   const enforceShortsSpeed = () => {
+      const video = getVideo();
+      if (!video) return;
+
+      const targetSpeed = state.targetSpeed || 1.0;
+
+      // Only enforce if not in special modes
+      if (!state.isAdSpeeding && !state.isKeyBoosting) {
+         if (Math.abs(video.playbackRate - targetSpeed) > 0.01) {
+            video.playbackRate = targetSpeed;
+            lastEnforcedSpeed = targetSpeed;
+         }
+      }
+   };
+
+   // Run speed enforcement every 100ms (very aggressive)
+   setInterval(enforceShortsSpeed, 100);
+
+   // ============================================================================
+   // SUPERIOR AUTO-SCROLL IMPLEMENTATION (Class-based, Event-driven)
+   // ============================================================================
+
+   class YouTubeShortsAutoScroll {
+      constructor(stateRef) {
+         this.state = stateRef;
+         this.currentVideo = null;
+         this.videoEndListener = null;
+         this.urlObserver = null;
+         this.lastURL = null; // Track URL changes
+         this.init();
+      }
+
+      init() {
+         // Monitor URL changes for Shorts navigation
+         this.observeURLChanges();
+         // Check if already on Shorts
+         this.checkForVideo();
+      }
+
+      observeURLChanges() {
+         // Detect SPA navigation
+         this.urlObserver = new MutationObserver(() => {
+            if (window.location.pathname.includes("/shorts/")) {
+               this.checkForVideo();
+            }
+         });
+
+         this.urlObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+         });
+      }
+
+      checkForVideo() {
+         if (!window.location.pathname.includes("/shorts/")) return;
+
+         // Find current Shorts video
+         const video = getVideo();
+
+         if (video && video !== this.currentVideo) {
+            this.currentVideo = video;
+            this.setupVideoListener(video);
+         }
+      }
+
+      setupVideoListener(video) {
+         // Remove old listeners
+         if (this.videoEndListener && this.currentVideo) {
+            this.currentVideo.removeEventListener("ended", this.videoEndListener);
+            this.currentVideo.removeEventListener("timeupdate", this.timeUpdateListener);
+         }
+
+         // Reset trigger flag
+         this.hasTriggered = false;
+
+         // Listener for video end
+         this.videoEndListener = () => this.onVideoEnd();
+         video.addEventListener("ended", this.videoEndListener);
+
+         // Listener for timeupdate (for looping videos that don't fire 'ended')
+         this.timeUpdateListener = () => {
+            // Check if URL changed (new Short)
+            const currentURL = window.location.pathname;
+            if (currentURL !== this.lastURL) {
+               this.lastURL = currentURL;
+               this.hasTriggered = false; // Reset flag on new Short
+               this.adSkipTriggered = false; // Reset ad skip flag
+               console.log("[Auto-Scroll] New Short detected, flag reset");
+            }
+
+            if (this.hasTriggered) return;
+
+            // Check if current Short is an ad and auto-skip
+            if (this.state.isAutoScrollShortsEnabled && this.isAd()) {
+               if (!this.adSkipTriggered) {
+                  this.adSkipTriggered = true;
+                  console.log("[Auto-Scroll] 🚫 Ad detected, skipping in 1s...");
+                  setTimeout(() => {
+                     this.scrollToNextShort();
+                  }, 1000); // Wait 1s before skipping ad
+               }
+               return;
+            }
+
+            const video = this.currentVideo;
+            if (!video || !video.duration) return;
+
+            // Check if within 0.5 seconds of end
+            const timeRemaining = video.duration - video.currentTime;
+            if (timeRemaining > 0 && timeRemaining < 0.5) {
+               this.hasTriggered = true;
+               this.onVideoEnd();
+            }
+         };
+         video.addEventListener("timeupdate", this.timeUpdateListener);
+
+         console.log("[Auto-Scroll] Listeners attached to video");
+      }
+
+      onVideoEnd() {
+         if (!this.state.isAutoScrollShortsEnabled) {
+            console.log("[Auto-Scroll] Feature disabled");
+            return;
+         }
+
+         console.log("[Auto-Scroll] Video ended, scrolling to next...");
+
+         // Small delay for UI to update
+         setTimeout(() => {
+            this.scrollToNextShort();
+         }, 500);
+      }
+
+      isAd() {
+         // Check for Shorts ad indicators
+         const adSelectors = [
+            "reels-ad-card-buttoned-view-model",
+            "ad-badge-view-model",
+            "yt-ad-metadata-shape",
+            ".ytwReelsAdCardButtonedViewModelHost",
+            "badge-shape.yt-badge-shape--ad",
+         ];
+
+         for (const selector of adSelectors) {
+            if (document.querySelector(selector)) {
+               return true;
+            }
+         }
+
+         // Check for "Sponsored" text
+         const sponsoredBadge = document.querySelector("badge-shape .yt-badge-shape__text");
+         if (sponsoredBadge && sponsoredBadge.textContent.includes("Sponsored")) {
+            return true;
+         }
+
+         return false;
+      }
+
+      scrollToNextShort() {
+         // Try multiple methods in order of reliability
+
+         // Method 1: Click YouTube's next button (most reliable)
+         if (this.clickNextButton()) {
+            console.log("[Auto-Scroll] ✓ Clicked next button");
+            return;
+         }
+
+         // Method 2: Simulate swipe gesture
+         if (this.simulateSwipe()) {
+            console.log("[Auto-Scroll] ✓ Simulated swipe");
+            return;
+         }
+
+         // Method 3: Scroll container
+         if (this.scrollContainer()) {
+            console.log("[Auto-Scroll] ✓ Scrolled container");
+            return;
+         }
+
+         // Method 4: Arrow key fallback
+         this.simulateArrowKey();
+         console.log("[Auto-Scroll] ✓ Simulated arrow key");
+      }
+
+      clickNextButton() {
+         const selectors = [
+            'button[aria-label="Next video"]',
+            'button[aria-label*="Next"]',
+            "#navigation-button-down button",
+            "button.ytp-next-button",
+            ".navigation-button.next",
+         ];
+
+         for (const selector of selectors) {
+            const button = document.querySelector(selector);
+            if (button && !button.disabled) {
+               button.click();
+               return true;
+            }
+         }
+
+         return false;
+      }
+
+      simulateSwipe() {
+         const container = document.querySelector("ytd-reel-video-renderer, #shorts-container");
+
+         if (!container) return false;
+
+         try {
+            // Create touch events for swipe down
+            const touch = new Touch({
+               identifier: Date.now(),
+               target: container,
+               clientX: window.innerWidth / 2,
+               clientY: window.innerHeight / 2,
+               radiusX: 2.5,
+               radiusY: 2.5,
+               rotationAngle: 0,
+               force: 0.5,
+            });
+
+            const touchStart = new TouchEvent("touchstart", {
+               touches: [touch],
+               targetTouches: [touch],
+               changedTouches: [touch],
+               bubbles: true,
+               cancelable: true,
+            });
+
+            const touchEnd = new TouchEvent("touchend", {
+               touches: [],
+               targetTouches: [],
+               changedTouches: [touch],
+               bubbles: true,
+               cancelable: true,
+            });
+
+            container.dispatchEvent(touchStart);
+            setTimeout(() => container.dispatchEvent(touchEnd), 50);
+
+            return true;
+         } catch (e) {
+            return false;
+         }
+      }
+
+      scrollContainer() {
+         const selectors = ["ytd-reel-video-renderer", "#shorts-container", "ytd-shorts", ".reel-video-in-sequence"];
+
+         for (const selector of selectors) {
+            const container = document.querySelector(selector);
+            if (container) {
+               container.scrollBy({
+                  top: window.innerHeight,
+                  behavior: "smooth",
+               });
+               return true;
+            }
+         }
+
+         return false;
+      }
+
+      simulateArrowKey() {
+         document.dispatchEvent(
+            new KeyboardEvent("keydown", {
+               key: "ArrowDown",
+               code: "ArrowDown",
+               keyCode: 40,
+               which: 40,
+               bubbles: true,
+               cancelable: true,
+            }),
+         );
+      }
+
+      destroy() {
+         if (this.urlObserver) {
+            this.urlObserver.disconnect();
+         }
+         if (this.videoEndListener && this.currentVideo) {
+            this.currentVideo.removeEventListener("ended", this.videoEndListener);
+            this.currentVideo.removeEventListener("timeupdate", this.timeUpdateListener);
+         }
+      }
+   }
+
+   // Initialize auto-scroll (will be created after state is defined)
+   let autoScrollManager = null;
 
    // State
    let state = {
       targetSpeed: 1.0,
-      isAutoSkipEnabled: true,
+      isAutoSkipEnabled: false, // Default: OFF (to avoid YouTube anti-adblock detection)
       isSpeedAdEnabled: true,
       isZenModeEnabled: false,
       isBoosterEnabled: true,
+      isAutoScrollShortsEnabled: false, // Auto-scroll to next Short when finished (default: OFF)
       volume: 1.0,
       loop: { active: false, start: null, end: null },
 
@@ -348,6 +662,7 @@ if (currentSite.type === "youtube") {
       // Focus Filter State
       isFocusModeEnabled: false, // Default: OFF
       isStrictModeEnabled: false,
+
       focusKeywords: [], // Array of lowercase strings
       activeCategories: [], // Array of active category IDs (e.g. ['food', 'tech'])
       customCategories: [], // Array of { id, name, keywords[], icon }
@@ -501,6 +816,7 @@ if (currentSite.type === "youtube") {
          isSpeedAdEnabled: state.isSpeedAdEnabled,
          isZenModeEnabled: state.isZenModeEnabled,
          isBoosterEnabled: state.isBoosterEnabled,
+         isAutoScrollShortsEnabled: state.isAutoScrollShortsEnabled,
          volume: state.volume,
          // Focus Persistence
          isFocusModeEnabled: state.isFocusModeEnabled,
@@ -510,7 +826,9 @@ if (currentSite.type === "youtube") {
          customCategories: state.customCategories,
          isMirrored: state.isMirrored,
       };
-      chrome.storage.local.set({ [STORAGE_KEY]: settings });
+      chrome.storage.local.set({ [STORAGE_KEY]: settings }, () => {
+         console.log("[Settings] Saved - Auto-scroll:", state.isAutoScrollShortsEnabled);
+      });
    };
 
    const loadSettings = () => {
@@ -521,6 +839,10 @@ if (currentSite.type === "youtube") {
             if (saved.isAutoSkipEnabled !== undefined) state.isAutoSkipEnabled = saved.isAutoSkipEnabled;
             if (saved.isSpeedAdEnabled !== undefined) state.isSpeedAdEnabled = saved.isSpeedAdEnabled;
             if (saved.isBoosterEnabled !== undefined) state.isBoosterEnabled = saved.isBoosterEnabled;
+            if (saved.isAutoScrollShortsEnabled !== undefined) {
+               state.isAutoScrollShortsEnabled = saved.isAutoScrollShortsEnabled;
+               console.log("[Settings] Loaded - Auto-scroll:", state.isAutoScrollShortsEnabled);
+            }
 
             // Load Focus
             if (saved.isFocusModeEnabled !== undefined) state.isFocusModeEnabled = saved.isFocusModeEnabled;
@@ -1291,6 +1613,10 @@ if (currentSite.type === "youtube") {
          if (!cachedIsAdPlaying && state.loop.active && state.loop.start !== null && state.loop.end !== null) {
             if (video.currentTime >= state.loop.end) video.currentTime = state.loop.start;
          }
+
+         // Auto-scroll is now handled by dedicated 'ended' event listener above
+         // (removed duplicate logic to prevent conflicts)
+
          if (state.isZenModeEnabled) updateZenStyle(state.isZenModeEnabled);
       }
    }, 1000);
@@ -1303,14 +1629,57 @@ if (currentSite.type === "youtube") {
       },
       { capture: true, passive: true },
    );
+
+   // Aggressive speed enforcement - catch when YouTube changes speed
+   let lastVideoElement = null;
+   const attachSpeedListener = () => {
+      const video = getVideo();
+      if (video && video !== lastVideoElement) {
+         lastVideoElement = video;
+
+         // Listen for speed changes and enforce our speed
+         video.addEventListener("ratechange", () => {
+            if (!state.isAdSpeeding && !state.isKeyBoosting) {
+               const expectedSpeed = state.targetSpeed || 1.0;
+               if (Math.abs(video.playbackRate - expectedSpeed) > 0.01) {
+                  // YouTube changed the speed, enforce ours
+                  setTimeout(() => {
+                     video.playbackRate = expectedSpeed;
+                  }, 10);
+               }
+            }
+         });
+
+         // Also enforce immediately
+         enforceSpeed();
+      }
+   };
+
+   // Attach listener initially and on navigation
+   attachSpeedListener();
+
    document.addEventListener("yt-navigate-finish", () => {
       setTimeout(() => {
+         attachSpeedListener();
          enforceSpeed();
          initObservers(); // Re-bind if player DOM replaced
       }, 500);
    });
 
+   // Monitor for video element changes (important for Shorts)
+   const videoObserver = new MutationObserver(() => {
+      attachSpeedListener();
+   });
+
+   videoObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+   });
+
    loadSettings();
+
+   // Initialize auto-scroll manager with state reference
+   autoScrollManager = new YouTubeShortsAutoScroll(state);
 
    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const video = getVideo();
@@ -1340,6 +1709,11 @@ if (currentSite.type === "youtube") {
             break;
          case "TOGGLE_BOOSTER":
             state.isBoosterEnabled = request.enabled;
+            needSave = true;
+            sendResponse({ success: true });
+            break;
+         case "TOGGLE_AUTO_SCROLL_SHORTS":
+            state.isAutoScrollShortsEnabled = request.enabled;
             needSave = true;
             sendResponse({ success: true });
             break;
@@ -1485,6 +1859,7 @@ if (currentSite.type === "youtube") {
                speedAds: state.isSpeedAdEnabled,
                zenMode: state.isZenModeEnabled,
                booster: state.isBoosterEnabled,
+               autoScrollShorts: state.isAutoScrollShortsEnabled,
                boostSpeed: state.boostSpeed,
                volume: state.volume,
                isMirrored: state.isMirrored,

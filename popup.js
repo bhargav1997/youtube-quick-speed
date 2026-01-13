@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
       speedAdsToggle: document.getElementById("speed-ads-toggle"),
       zenModeToggle: document.getElementById("zen-mode-toggle"),
       boosterToggle: document.getElementById("booster-toggle"),
+      autoScrollShortsToggle: document.getElementById("auto-scroll-shorts-toggle"),
 
       // New Boost Controls
       boostKeySelect: document.getElementById("boostKeySelect"),
@@ -164,6 +165,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (state.speedAds !== undefined && elements.speedAdsToggle) elements.speedAdsToggle.checked = state.speedAds;
       if (state.zenMode !== undefined && elements.zenModeToggle) elements.zenModeToggle.checked = state.zenMode;
       if (state.booster !== undefined && elements.boosterToggle) elements.boosterToggle.checked = state.booster;
+      if (state.autoScrollShorts !== undefined && elements.autoScrollShortsToggle)
+         elements.autoScrollShortsToggle.checked = state.autoScrollShorts;
 
       // Focus Settings
       if (state.focusMode !== undefined && elements.focusToggle) elements.focusToggle.checked = state.focusMode;
@@ -399,6 +402,12 @@ document.addEventListener("DOMContentLoaded", () => {
       });
    }
 
+   if (elements.autoScrollShortsToggle) {
+      elements.autoScrollShortsToggle.addEventListener("change", async (e) => {
+         await sendMessage({ action: "TOGGLE_AUTO_SCROLL_SHORTS", enabled: e.target.checked });
+      });
+   }
+
    // Focus Mode Listeners
    if (elements.focusToggle) {
       elements.focusToggle.addEventListener("change", async (e) => {
@@ -616,10 +625,18 @@ document.addEventListener("DOMContentLoaded", () => {
             elements.btnToggleSite.style.cursor = "pointer";
          }
 
-         const response = await chrome.runtime.sendMessage({
-            action: "IS_WHITELISTED",
-            url: tab.url,
-         });
+         // Try to communicate with service worker, handle if inactive
+         let response;
+         try {
+            response = await chrome.runtime.sendMessage({
+               action: "IS_WHITELISTED",
+               url: tab.url,
+            });
+         } catch (e) {
+            // Service worker is inactive - use default state
+            console.log("[AdBlocker] Service worker inactive, using default state");
+            response = { isWhitelisted: false };
+         }
 
          if (elements.toggleSiteText) {
             if (response?.isWhitelisted) {
@@ -635,7 +652,8 @@ document.addEventListener("DOMContentLoaded", () => {
             }
          }
       } catch (e) {
-         console.error("Error updating toggle button:", e);
+         // Silently handle errors - don't spam console
+         console.log("[AdBlocker] Toggle button update skipped:", e.message);
       }
    }
 
@@ -648,38 +666,56 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const hostname = new URL(tab.url).hostname;
 
-            // Check if whitelisted
-            const response = await chrome.runtime.sendMessage({
-               action: "IS_WHITELISTED",
-               url: tab.url,
-            });
-
-            if (response?.isWhitelisted) {
-               // Remove from whitelist
-               await chrome.runtime.sendMessage({
-                  action: "REMOVE_FROM_WHITELIST",
-                  hostname,
+            // Check if whitelisted - with error handling
+            let response;
+            try {
+               response = await chrome.runtime.sendMessage({
+                  action: "IS_WHITELISTED",
+                  url: tab.url,
                });
-            } else {
-               // Add to whitelist
-               await chrome.runtime.sendMessage({
-                  action: "ADD_TO_WHITELIST",
-                  hostname,
-               });
+            } catch (e) {
+               console.log("[AdBlocker] Service worker inactive, assuming not whitelisted");
+               response = { isWhitelisted: false };
             }
 
-            // Update UI
-            await updateToggleButton();
-            await loadWhitelist();
+            // Toggle whitelist status
+            try {
+               if (response?.isWhitelisted) {
+                  // Remove from whitelist
+                  await chrome.runtime.sendMessage({
+                     action: "REMOVE_FROM_WHITELIST",
+                     hostname,
+                  });
+               } else {
+                  // Add to whitelist
+                  await chrome.runtime.sendMessage({
+                     action: "ADD_TO_WHITELIST",
+                     hostname,
+                  });
+               }
 
-            // Show feedback
-            const originalText = elements.toggleSiteText.textContent;
-            elements.toggleSiteText.textContent = "✓ Updated!";
-            setTimeout(() => {
-               updateToggleButton();
-            }, 1000);
+               // Update UI
+               await updateToggleButton();
+               await loadWhitelist();
+
+               // Show feedback
+               const originalText = elements.toggleSiteText.textContent;
+               elements.toggleSiteText.textContent = "✓ Updated!";
+               setTimeout(() => {
+                  updateToggleButton();
+               }, 1000);
+            } catch (e) {
+               // Show error to user
+               if (elements.toggleSiteText) {
+                  elements.toggleSiteText.textContent = "⚠ Error - Reload";
+                  setTimeout(() => {
+                     updateToggleButton();
+                  }, 2000);
+               }
+               console.log("[AdBlocker] Failed to toggle whitelist:", e.message);
+            }
          } catch (e) {
-            console.error("Error toggling whitelist:", e);
+            console.log("[AdBlocker] Toggle whitelist error:", e.message);
          }
       });
    }
