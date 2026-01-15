@@ -151,12 +151,19 @@ const hideUniversalAds = (removeCompletely = true) => {
       'iframe[src*="popunder"]', // Popunder iframes
       'iframe[src*="popup"]', // Popup iframes
 
-      // Generic popup containers (more specific)
-      '[id*="popup" i][id*="ad" i]', // Popup + ad IDs
-      '[class*="popup" i][class*="ad" i]', // Popup + ad classes
-      '[class*="overlay" i][class*="ad" i]', // Overlay + ad classes
-      '[class*="modal" i][class*="ad" i]', // Modal + ad classes
-      '[id*="modal" i][id*="ad" i]', // Modal + ad IDs
+      // Specific ad popup containers (exact matches only to avoid false positives)
+      "#popup-ad",
+      "#ad-popup",
+      ".popup-ad",
+      ".ad-popup",
+      "#modal-ad",
+      "#ad-modal",
+      ".modal-ad",
+      ".ad-modal",
+      "#overlay-ad",
+      "#ad-overlay",
+      ".overlay-ad",
+      ".ad-overlay",
    ];
 
    let hiddenCount = 0;
@@ -255,7 +262,7 @@ const currentSite = detectCurrentSite();
 const isInternalPage =
    window.location.protocol === "chrome:" || window.location.protocol === "about:" || window.location.protocol === "chrome-extension:";
 
-// Skip ad blocking on Google productivity apps (Gmail, Drive, Docs, etc.)
+// Skip ad blocking on Google productivity apps (Gmail, Drive, Docs, etc.) and professional sites
 const isGoogleApp =
    currentSite.hostname.includes("mail.google.com") ||
    currentSite.hostname.includes("drive.google.com") ||
@@ -266,9 +273,10 @@ const isGoogleApp =
    currentSite.hostname.includes("meet.google.com") ||
    currentSite.hostname.includes("chat.google.com") ||
    currentSite.hostname.includes("keep.google.com") ||
-   currentSite.hostname.includes("photos.google.com");
+   currentSite.hostname.includes("photos.google.com") ||
+   currentSite.hostname.includes("linkedin.com"); // Protect LinkedIn job applications and professional features
 
-if (currentSite.type !== "youtube") {
+if (currentSite.type !== "youtube" && !isInternalPage && !isGoogleApp) {
    // Activate popup & redirect blocking immediately
    blockPopupsAndRedirects();
 
@@ -382,6 +390,7 @@ if (currentSite.type === "youtube") {
          this.videoEndListener = null;
          this.urlObserver = null;
          this.lastURL = null; // Track URL changes
+         this.lastScrollTime = 0; // Track last scroll time for cooldown
          this.init();
       }
 
@@ -487,31 +496,51 @@ if (currentSite.type === "youtube") {
       }
 
       isAd() {
-         // Check for Shorts ad indicators
+         // Find the container for the CURRENT video only
+         const video = this.currentVideo;
+         if (!video) return false;
+
+         // find identifying parent container
+         const container = video.closest("ytd-reel-video-renderer") || video.closest("ytd-shorts");
+         if (!container) return false;
+
+         // Check for Shorts ad indicators WITHIN the current container
          const adSelectors = [
             "reels-ad-card-buttoned-view-model",
             "ad-badge-view-model",
             "yt-ad-metadata-shape",
             ".ytwReelsAdCardButtonedViewModelHost",
             "badge-shape.yt-badge-shape--ad",
+
+            // Structural component selectors
+            "ytd-in-feed-ad-layout-renderer",
+            "reels-ad-metadata-view-model",
+            "ad-button-view-model",
+            ".ytwAdBadgeViewModelHost",
          ];
 
          for (const selector of adSelectors) {
-            if (document.querySelector(selector)) {
+            if (container.querySelector(selector)) {
+               console.log("[Auto-Scroll] Ad detected via:", selector);
                return true;
             }
-         }
-
-         // Check for "Sponsored" text
-         const sponsoredBadge = document.querySelector("badge-shape .yt-badge-shape__text");
-         if (sponsoredBadge && sponsoredBadge.textContent.includes("Sponsored")) {
-            return true;
          }
 
          return false;
       }
 
       scrollToNextShort() {
+         // Global cooldown: prevent scrolling more than once every 2 seconds
+         const now = Date.now();
+         const timeSinceLastScroll = now - this.lastScrollTime;
+
+         if (timeSinceLastScroll < 2000) {
+            console.log("[Auto-Scroll] ⏸️ Cooldown active, skipping scroll");
+            return;
+         }
+
+         this.lastScrollTime = now;
+
          // Try multiple methods in order of reliability
 
          // Method 1: Click YouTube's next button (most reliable)
