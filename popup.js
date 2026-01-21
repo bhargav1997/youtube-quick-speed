@@ -989,9 +989,9 @@ document.addEventListener("DOMContentLoaded", () => {
    }
 
    // ============================================================================
-   // THUMBNAIL DOWNLOADER
+   // THUMBNAIL DOWNLOADER - TEMPORARILY DISABLED FOR CHROME WEB STORE COMPLIANCE
    // ============================================================================
-
+   /*
    const thumbnailElements = {
       qualityBtns: document.querySelectorAll(".thumbnail-quality-btn"),
       downloadBtn: document.getElementById("btn-download-thumbnail"),
@@ -1156,6 +1156,7 @@ document.addEventListener("DOMContentLoaded", () => {
          loadThumbnailPreview();
       }, 500);
    }
+   */
 
    // ============================================================================
    // CUSTOM SPEED PRESETS
