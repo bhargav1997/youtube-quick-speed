@@ -29,6 +29,146 @@ const safeSendMessage = (message) => {
    });
 };
 
+// ============================================================================
+// GLOBAL STATE & TOOLS (Zapper, Screenshot, etc.)
+// ============================================================================
+
+let state = {
+   targetSpeed: 1.0,
+   isAutoSkipEnabled: false,
+   isSpeedAdEnabled: true,
+   isZenModeEnabled: false,
+   isBoosterEnabled: true,
+   isAutoScrollShortsEnabled: false,
+   volume: 1.0,
+   loop: { active: false, start: null, end: null },
+   boostKey: "Shift",
+   boostSpeed: 2.5,
+   isFocusModeEnabled: false,
+   isStrictModeEnabled: false,
+   focusKeywords: [],
+   activeCategories: [],
+   customCategories: [],
+   isMirrored: false,
+   isZapperActive: false,
+};
+
+let zapperListeners = null;
+
+// Inject Zapper CSS
+const injectZapperStyles = () => {
+   if (document.getElementById("yqs-zapper-styles")) return;
+   const style = document.createElement("style");
+   style.id = "yqs-zapper-styles";
+   style.innerHTML = `
+      .yqs-zapper-highlight {
+         outline: 3px solid #ff416c !important;
+         outline-offset: -3px !important;
+         background-color: rgba(255, 65, 108, 0.1) !important;
+         cursor: crosshair !important;
+         transition: outline 0.1s ease !important;
+      }
+   `;
+   document.head.appendChild(style);
+};
+injectZapperStyles();
+
+const getSelector = (el) => {
+   if (el.id) return `#${CSS.escape(el.id)}`;
+   const parts = [];
+   while (el && el.nodeType === Node.ELEMENT_NODE) {
+      let selector = el.nodeName.toLowerCase();
+      if (el.className && typeof el.className === "string") {
+         const classes = el.className
+            .trim()
+            .split(/\s+/)
+            .filter((c) => c && !c.startsWith("yqs-"));
+         if (classes.length) selector += "." + classes.map((c) => CSS.escape(c)).join(".");
+      }
+      const parent = el.parentNode;
+      if (parent && parent.nodeType === Node.ELEMENT_NODE) {
+         const siblings = Array.from(parent.children).filter((s) => s.nodeName === el.nodeName);
+         if (siblings.length > 1) {
+            const index = siblings.indexOf(el) + 1;
+            selector += `:nth-of-type(${index})`;
+         }
+      }
+      parts.unshift(selector);
+      el = el.parentNode;
+      if (parts.length > 3) break;
+   }
+   return parts.join(" > ");
+};
+
+const applyZaps = async () => {
+   const hostname = window.location.hostname;
+   const key = `zaps_${hostname}`;
+   chrome.storage.local.get([key], (data) => {
+      const selectors = data[key] || [];
+      if (selectors.length) {
+         const styleId = "yqs-zapper-persisted";
+         let style = document.getElementById(styleId);
+         if (!style) {
+            style = document.createElement("style");
+            style.id = styleId;
+            document.head.appendChild(style);
+         }
+         style.textContent = selectors.map((s) => `${s} { display: none !important; }`).join("\n");
+      }
+   });
+};
+
+const toggleZapper = (active) => {
+   state.isZapperActive = active;
+   if (active) {
+      const onMouseOver = (e) => {
+         e.stopPropagation();
+         e.target.classList.add("yqs-zapper-highlight");
+      };
+      const onMouseOut = (e) => {
+         e.target.classList.remove("yqs-zapper-highlight");
+      };
+      const onClick = (e) => {
+         e.preventDefault();
+         e.stopPropagation();
+         const el = e.target;
+         const selector = getSelector(el);
+         el.style.setProperty("display", "none", "important");
+         const hostname = window.location.hostname;
+         const key = `zaps_${hostname}`;
+         chrome.storage.local.get([key], (data) => {
+            const selectors = data[key] || [];
+            if (!selectors.includes(selector)) {
+               selectors.push(selector);
+               chrome.storage.local.set({ [key]: selectors });
+            }
+         });
+      };
+      const onKeyDown = (e) => {
+         if (e.key === "Escape") toggleZapper(false);
+      };
+      document.addEventListener("mouseover", onMouseOver, true);
+      document.addEventListener("mouseout", onMouseOut, true);
+      document.addEventListener("click", onClick, true);
+      document.addEventListener("keydown", onKeyDown, true);
+      zapperListeners = { onMouseOver, onMouseOut, onClick, onKeyDown };
+      document.body.style.cursor = "crosshair";
+   } else {
+      if (zapperListeners) {
+         document.removeEventListener("mouseover", zapperListeners.onMouseOver, true);
+         document.removeEventListener("mouseout", zapperListeners.onMouseOut, true);
+         document.removeEventListener("click", zapperListeners.onClick, true);
+         document.removeEventListener("keydown", zapperListeners.onKeyDown, true);
+         zapperListeners = null;
+      }
+      document.querySelectorAll(".yqs-zapper-highlight").forEach((el) => el.classList.remove("yqs-zapper-highlight"));
+      document.body.style.cursor = "";
+   }
+};
+
+// Run Zaps on every page immediately
+applyZaps();
+
 // Site Detection
 const detectCurrentSite = () => {
    const hostname = window.location.hostname;
@@ -39,7 +179,6 @@ const detectCurrentSite = () => {
       return { type: "youtube", hasVideo: true, hostname };
    }
 
-   // All other sites get universal ad blocking
    return {
       type: "generic",
       hasVideo,
@@ -711,41 +850,6 @@ if (currentSite.type === "youtube") {
       }
    }
 
-   // Initialize auto-scroll (will be created after state is defined)
-   let autoScrollManager = null;
-
-   // State
-   let state = {
-      targetSpeed: 1.0,
-      isAutoSkipEnabled: false, // Default: OFF (to avoid YouTube anti-adblock detection)
-      isSpeedAdEnabled: true,
-      isZenModeEnabled: false,
-      isBoosterEnabled: true,
-      isAutoScrollShortsEnabled: false, // Auto-scroll to next Short when finished (default: OFF)
-      volume: 1.0,
-      loop: { active: false, start: null, end: null },
-
-      // Boost Settings (Configurable)
-      boostKey: "Shift",
-      boostSpeed: 2.5,
-
-      // Focus Filter State
-      isFocusModeEnabled: false, // Default: OFF
-      isStrictModeEnabled: false,
-
-      focusKeywords: [], // Array of lowercase strings
-      activeCategories: [], // Array of active category IDs (e.g. ['food', 'tech'])
-      customCategories: [], // Array of { id, name, keywords[], icon }
-      isMirrored: false,
-
-      // Internal state
-      originalSpeed: 1.0,
-      originalMuted: false,
-      isAdSpeeding: false,
-      adSkipClicked: false,
-      isKeyBoosting: false,
-   };
-
    // CATEGORY DEFINITIONS
    const PRESET_CATEGORIES = {
       food: ["food", "cooking", "recipe", "kitchen", "chef", "meal", "eating", "mukbang", "taste test", "street food", "restaurant"],
@@ -875,6 +979,207 @@ if (currentSite.type === "youtube") {
    };
 
    // ---------------------------------------------------------
+   // VIDEO ENHANCER LOGIC
+   // ---------------------------------------------------------
+   const applyVideoFilters = () => {
+      const video = getVideo();
+      if (!video) return;
+
+      const { brightness, contrast, saturation, grayscale, invert, rotate } = state.filters || {};
+
+      const filterString = `
+         brightness(${brightness}%) 
+         contrast(${contrast}%) 
+         saturate(${saturation}%) 
+         grayscale(${grayscale ? 1 : 0}) 
+         invert(${invert ? 1 : 0})
+      `;
+
+      // Apply CSS transform and filter
+      video.style.filter = filterString;
+
+      // Handle Rotation
+      if (rotate !== undefined && rotate !== 0) {
+         // You might need to adjust scale to fit screen when rotated 90/270
+         let scale = 1;
+         if (rotate % 180 !== 0) {
+            const rect = video.getBoundingClientRect();
+            // Rudimentary scale to prevent black bars being too huge, user can adjust
+            // scale = rect.width / rect.height; // Simplistic
+            scale = 1; // Keeping simple for now
+         }
+         video.style.transform = `rotate(${rotate}deg) scale(${scale})`;
+      } else {
+         video.style.transform = "";
+      }
+   };
+
+   // Ensure filters persist if video changes (hook into existing interval or observer)
+   // We can add it to 'checkLoop' or similar periodic check if needed,
+   // but primarily we trust the video element persistence.
+   // However, YouTube re-renders video tags sometimes.
+   setInterval(applyVideoFilters, 1000); // Low frequency check to ensure persistence
+
+   // ---------------------------------------------------------
+   // MESSAGE LISTENER
+   // ---------------------------------------------------------
+   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      const video = getVideo();
+
+      switch (request.action) {
+         case "GET_STATE":
+            sendResponse({
+               speed: state.targetSpeed,
+               loop: state.loop,
+               boostKey: state.boostKey,
+               boostSpeed: state.boostSpeed,
+               isAutoSkipEnabled: state.isAutoSkipEnabled,
+               isSpeedAdEnabled: state.isSpeedAdEnabled,
+               isZenModeEnabled: state.isZenModeEnabled,
+               isBoosterEnabled: state.isBoosterEnabled,
+               isAutoScrollShortsEnabled: state.isAutoScrollShortsEnabled,
+               activeCategories: state.activeCategories,
+               customCategories: state.customCategories,
+               focusKeywords: state.focusKeywords,
+               isFocusModeEnabled: state.isFocusModeEnabled,
+               isStrictModeEnabled: state.isStrictModeEnabled,
+               volume: state.volume,
+               filters: state.filters, // Send filters back
+            });
+            break;
+
+         case "SET_FILTERS":
+            if (request.filters) {
+               state.filters = { ...state.filters, ...request.filters };
+               applyVideoFilters();
+            }
+            sendResponse({ success: true, filters: state.filters });
+            break;
+         case "SET_SPEED":
+            if (video) {
+               video.playbackRate = request.speed;
+               state.targetSpeed = request.speed;
+               saveSettings();
+            }
+            sendResponse({ speed: state.targetSpeed });
+            break;
+
+         case "TOGGLE_AUTOSKIP":
+            state.isAutoSkipEnabled = request.enabled;
+            saveSettings();
+            sendResponse({ isAutoSkipEnabled: state.isAutoSkipEnabled });
+            break;
+
+         case "TOGGLE_SPEED_ADS":
+            state.isSpeedAdEnabled = request.enabled;
+            saveSettings();
+            sendResponse({ isSpeedAdEnabled: state.isSpeedAdEnabled });
+            break;
+
+         case "TOGGLE_ZEN_MODE":
+            toggleZenMode(request.enabled);
+            saveSettings();
+            sendResponse({ isZenModeEnabled: state.isZenModeEnabled });
+            break;
+
+         case "TOGGLE_BOOSTER":
+            state.isBoosterEnabled = request.enabled;
+            saveSettings();
+            sendResponse({ isBoosterEnabled: state.isBoosterEnabled });
+            break;
+
+         case "TOGGLE_AUTO_SCROLL_SHORTS":
+            state.isAutoScrollShortsEnabled = request.enabled;
+            if (state.isAutoScrollShortsEnabled && !autoScrollManager) {
+               autoScrollManager = new AutoScrollManager();
+            } else if (!state.isAutoScrollShortsEnabled && autoScrollManager) {
+               autoScrollManager.destroy();
+               autoScrollManager = null;
+            }
+            saveSettings();
+            sendResponse({ isAutoScrollShortsEnabled: state.isAutoScrollShortsEnabled });
+            break;
+
+         case "SET_VOLUME":
+            setVolume(request.volume);
+            saveSettings();
+            sendResponse({ volume: state.volume });
+            break;
+
+         case "SET_LOOP":
+            state.loop = request.loop;
+            saveSettings();
+            sendResponse({ loop: state.loop });
+            break;
+
+         case "SET_BOOST_SETTINGS":
+            state.boostKey = request.boostKey;
+            state.boostSpeed = request.boostSpeed;
+            saveSettings();
+            sendResponse({ boostKey: state.boostKey, boostSpeed: state.boostSpeed });
+            break;
+
+         case "TOGGLE_FOCUS_MODE":
+            state.isFocusModeEnabled = request.enabled;
+            if (state.isFocusModeEnabled) {
+               runFocusFilter();
+            } else {
+               clearFocusFilter();
+            }
+            saveSettings();
+            sendResponse({ isFocusModeEnabled: state.isFocusModeEnabled });
+            break;
+
+         case "TOGGLE_STRICT_MODE":
+            state.isStrictModeEnabled = request.enabled;
+            if (state.isFocusModeEnabled) {
+               runFocusFilter();
+            }
+            saveSettings();
+            sendResponse({ isStrictModeEnabled: state.isStrictModeEnabled });
+            break;
+
+         case "SET_FOCUS_KEYWORDS":
+            state.focusKeywords = request.keywords;
+            if (state.isFocusModeEnabled) {
+               runFocusFilter();
+            }
+            saveSettings();
+            sendResponse({ focusKeywords: state.focusKeywords });
+            break;
+
+         case "SET_ACTIVE_CATEGORIES":
+            state.activeCategories = request.categories;
+            if (state.isFocusModeEnabled) {
+               runFocusFilter();
+            }
+            saveSettings();
+            sendResponse({ activeCategories: state.activeCategories });
+            break;
+
+         case "SET_CUSTOM_CATEGORIES":
+            state.customCategories = request.categories;
+            if (state.isFocusModeEnabled) {
+               runFocusFilter();
+            }
+            saveSettings();
+            sendResponse({ customCategories: state.customCategories });
+            break;
+
+         case "TAKE_SNAPSHOT":
+            takeSnapshot();
+            sendResponse({ success: true });
+            break;
+
+         case "TOGGLE_MIRROR":
+            toggleMirror(request.enabled);
+            saveSettings();
+            sendResponse({ isMirrored: state.isMirrored });
+            break;
+      }
+   });
+
+   // ---------------------------------------------------------
    // STORAGE & PERSISTENCE
    // ---------------------------------------------------------
    const STORAGE_KEY = "yt_quick_speed_settings";
@@ -895,6 +1200,7 @@ if (currentSite.type === "youtube") {
          activeCategories: state.activeCategories,
          customCategories: state.customCategories,
          isMirrored: state.isMirrored,
+         filters: state.filters, // Save filters
       };
       chrome.storage.local.set({ [STORAGE_KEY]: settings }, () => {
          console.log("[Settings] Saved - Auto-scroll:", state.isAutoScrollShortsEnabled);
@@ -1248,7 +1554,7 @@ if (currentSite.type === "youtube") {
                video.muted = state.originalMuted;
             }
 
-            // CRITICAL FIX: Ensure we don't accidentally keep 16x speed
+            // CRITICAL FIX: Ensure we don't accidentally keep high speeds
             // If speed is excessively high and we are not boosting, force reset.
             if (video.playbackRate > 8.0) {
                video.playbackRate = state.targetSpeed || 1.0;
@@ -1290,8 +1596,12 @@ if (currentSite.type === "youtube") {
                state.originalMuted = video.muted;
                state.isAdSpeeding = true;
             }
-            // Force 16x
-            if (video.playbackRate !== 16.0) video.playbackRate = 16.0;
+            // Force Speed: ENABLED as per user request (6x)
+            // Note: Excessive speeds might trigger YouTube's "Ad blockers not allowed".
+            // If user enables this, they accept the risk.
+            if (video.playbackRate !== 4.0) video.playbackRate = 4.0;
+
+            // Mute is usually safe and preferred
             if (!video.muted) video.muted = true;
          }
          return;
@@ -1357,17 +1667,75 @@ if (currentSite.type === "youtube") {
       if (popupCooldown) return;
 
       // 1. SPECIFIC CHECK: YouTube "Ad blockers are not allowed" dialog (Repeated handling allowed with cooldown)
-      const enforcement = document.querySelector("ytd-enforcement-message-view-model");
-      if (enforcement) {
-         const closeBtn = enforcement.querySelector("#dismiss-button button") || enforcement.querySelector('button[aria-label="Close"]');
+      // 1. SPECIFIC CHECK: YouTube "Ad blockers are not allowed" dialog
+      // Strategy: Click dismiss if available, otherwise Nuke the popup from DOM and resume video.
+      const enforcement = document.querySelector("ytd-enforcement-message-view-model") || document.querySelector("tp-yt-paper-dialog");
 
-         if (closeBtn) {
-            triggerClick(closeBtn);
+      if (enforcement) {
+         // Verify it's the ad-block popup by checking text content if generic dialog
+         if (enforcement.tagName === "TP-YT-PAPER-DIALOG" && !enforcement.innerText.includes("Ad blockers")) {
+            // Not the droid we are looking for (probably playlist/share dialog)
+         } else {
+            console.log("[Auto-Skip] 🚫 Enforcement popup detected");
+            const closeBtn =
+               enforcement.querySelector("#dismiss-button button") ||
+               enforcement.querySelector('button[aria-label="Close"]') ||
+               enforcement.querySelector(".yt-spec-button-shape-next--filled"); // generic primary button fallback
+
+            if (closeBtn) {
+               console.log("[Auto-Skip] 👆 Clicking dismiss button");
+               triggerClick(closeBtn);
+            } else {
+               console.log("[Auto-Skip] 🗑️ Removing enforcement popup from DOM");
+               enforcement.remove(); // Aggressive removal
+
+               // Also remove the backdrop (grey overlay)
+               const backdrop = document.querySelector("tp-yt-iron-overlay-backdrop");
+               if (backdrop) backdrop.remove();
+            }
+
+            // Force resume video (often paused by the popup)
+            const video = getVideo();
+            if (video && video.paused) {
+               console.log("[Auto-Skip] ▶️ Resuming video");
+               video.play();
+            }
+
             popupCooldown = true;
             setTimeout(() => {
                popupCooldown = false;
             }, 1000);
             return;
+         }
+      }
+
+      // 3. GENERIC TEXT SEARCH (Brute Force Fallback)
+      // Only run this if we didn't find the specific enforcement element above, OR run it anyway.
+      // We look for any dialogue that contains the forbidden words.
+      if (!popupCooldown) {
+         const dialogs = document.querySelectorAll(
+            "tp-yt-paper-dialog, .ytd-popup-container, ytd-enforcement-message-view-model, [role='dialog']",
+         );
+         for (const dialog of dialogs) {
+            if (
+               dialog.innerText &&
+               (dialog.innerText.includes("Ad blockers are not allowed") || dialog.innerText.includes("Video playback is blocked"))
+            ) {
+               console.log("[Auto-Skip] 🚨 Generic popup detection triggered");
+               dialog.remove();
+               const backdrop = document.querySelector("tp-yt-iron-overlay-backdrop");
+               if (backdrop) backdrop.remove();
+
+               // Resume
+               const video = getVideo();
+               if (video && video.paused) video.play();
+
+               popupCooldown = true;
+               setTimeout(() => {
+                  popupCooldown = false;
+               }, 1000);
+               return; // Exit after handling
+            }
          }
       }
 
@@ -1833,6 +2201,50 @@ if (currentSite.type === "youtube") {
             sendResponse({ success: true, loop: state.loop });
             break;
 
+         case "TOGGLE_PIP":
+            (async () => {
+               try {
+                  const v = getVideo();
+                  if (!v) throw new Error("No video found");
+
+                  if (document.pictureInPictureElement) {
+                     await document.exitPictureInPicture();
+                     sendResponse({ active: false });
+                  } else {
+                     await v.requestPictureInPicture();
+
+                     // Show instruction toast
+                     const toast = document.createElement("div");
+                     toast.textContent = "Pip Active: Drag window to move";
+                     Object.assign(toast.style, {
+                        position: "fixed",
+                        bottom: "20px",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        background: "rgba(0,0,0,0.8)",
+                        color: "white",
+                        padding: "10px 20px",
+                        borderRadius: "5px",
+                        zIndex: "9999",
+                        fontSize: "14px",
+                        pointerEvents: "none",
+                        transition: "opacity 0.5s",
+                     });
+                     document.body.appendChild(toast);
+                     setTimeout(() => {
+                        toast.style.opacity = "0";
+                        setTimeout(() => toast.remove(), 500);
+                     }, 3000);
+
+                     sendResponse({ active: true });
+                  }
+               } catch (e) {
+                  console.error("PiP Error:", e);
+                  sendResponse({ error: e.message });
+               }
+            })();
+            return true;
+
          // KEYWORD HANDLERS
          case "TOGGLE_FOCUS_MODE":
             state.isFocusModeEnabled = request.enabled;
@@ -1991,14 +2403,28 @@ if (currentSite.type === "youtube") {
 // ============================================================================
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-   // Check if ScreenshotUtil is available
-   if (!window.ScreenshotUtil) {
-      console.error("[Screenshot] ScreenshotUtil not loaded");
-      sendResponse({ success: false, error: "Screenshot utility not available" });
+   // Verify screenshot utility only for screenshot actions
+   if (request.action && request.action.includes("SCREENSHOT") && !window.ScreenshotUtil) {
+      sendResponse({ success: false, error: "Screenshot utility not loaded" });
       return false;
    }
 
    switch (request.action) {
+      case "TOGGLE_ZAPPER":
+         toggleZapper(request.enabled);
+         sendResponse({ success: true, active: state.isZapperActive });
+         return true;
+
+      case "CLEAR_ZAPS":
+         const hostname = window.location.hostname;
+         chrome.storage.local.remove([`zaps_${hostname}`], () => {
+            // Remove the style tag if it exists
+            const style = document.getElementById("yqs-zapper-persisted");
+            if (style) style.remove();
+            sendResponse({ success: true });
+         });
+         return true;
+
       case "CAPTURE_SCREENSHOT":
          (async () => {
             try {

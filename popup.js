@@ -51,6 +51,33 @@ document.addEventListener("DOMContentLoaded", () => {
       btnResetStats: document.getElementById("btn-reset-stats"),
       whitelistContainer: document.getElementById("whitelist-container"),
       whitelistCount: document.getElementById("whitelist-count"),
+
+      // VIDEO ENHANCER (Cinema Mode)
+      filterBrightness: document.getElementById("filter-brightness"),
+      filterContrast: document.getElementById("filter-contrast"),
+      filterSaturation: document.getElementById("filter-saturation"),
+      filterGrayscale: document.getElementById("filter-grayscale"),
+      filterInvert: document.getElementById("filter-invert"),
+      btnRotate: document.getElementById("btn-rotate"),
+      valBrightness: document.getElementById("val-brightness"),
+      valContrast: document.getElementById("val-contrast"),
+      valSaturation: document.getElementById("val-saturation"),
+      btnResetFilters: document.getElementById("btn-reset-filters"),
+      btnPip: document.getElementById("btn-pip"),
+
+      // Collapsible
+      headerCinemaMode: document.getElementById("header-cinema-mode"),
+      contentCinemaMode: document.getElementById("content-cinema-mode"),
+
+      // Page Eraser (Zapper)
+      btnToggleZapper: document.getElementById("btn-toggle-zapper"),
+      btnResetZaps: document.getElementById("btn-reset-zaps"),
+      zapperStatus: document.getElementById("zapper-status"),
+      zapperLight: document.getElementById("zapper-light"),
+      zapperControls: document.getElementById("zapper-controls"),
+
+      // Factory Reset
+      btnFactoryReset: document.getElementById("btn-factory-reset"),
    };
 
    // Nav Items
@@ -99,7 +126,8 @@ document.addEventListener("DOMContentLoaded", () => {
    // Helper: Send Message safely
    async function sendMessage(payload) {
       const tab = await getActiveTab();
-      if (tab && tab.id && (tab.url.includes("youtube.com") || tab.url.includes("youtu.be"))) {
+      if (tab && tab.id) {
+         // Support all sites for universal tools
          return new Promise((resolve) => {
             chrome.tabs.sendMessage(tab.id, payload, (response) => {
                if (chrome.runtime.lastError) {
@@ -207,6 +235,38 @@ document.addEventListener("DOMContentLoaded", () => {
          else elements.volValue.style.color = "";
       }
 
+      // Filters (Cinema Mode)
+      if (state.filters) {
+         if (elements.filterBrightness) {
+            elements.filterBrightness.value = state.filters.brightness;
+            elements.valBrightness.textContent = `${state.filters.brightness}%`;
+         }
+         if (elements.filterContrast) {
+            elements.filterContrast.value = state.filters.contrast;
+            elements.valContrast.textContent = `${state.filters.contrast}%`;
+         }
+         if (elements.filterSaturation) {
+            elements.filterSaturation.value = state.filters.saturation;
+            elements.valSaturation.textContent = `${state.filters.saturation}%`;
+         }
+         if (elements.filterGrayscale) elements.filterGrayscale.checked = state.filters.grayscale;
+         if (elements.filterInvert) elements.filterInvert.checked = state.filters.invert;
+
+         // Update Cinema Mode Header Active State
+         if (elements.headerCinemaMode) {
+            const isActive = checkCinemaModeActive(state.filters);
+            if (isActive) {
+               elements.headerCinemaMode.style.borderLeft = "3px solid var(--primary-color)";
+               elements.headerCinemaMode.style.background = "rgba(255, 255, 255, 0.05)";
+               if (elements.btnResetFilters) elements.btnResetFilters.style.display = "flex";
+            } else {
+               elements.headerCinemaMode.style.borderLeft = "none";
+               elements.headerCinemaMode.style.background = "";
+               if (elements.btnResetFilters) elements.btnResetFilters.style.display = "none";
+            }
+         }
+      }
+
       // Loop
       if (state.loop) {
          elements.timeA.textContent = formatTime(state.loop.start);
@@ -239,6 +299,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "isFocusModeEnabled",
             "isStrictModeEnabled",
             "volume",
+            "filters", // Load filters from storage
          ]);
 
          // Map storage keys to UI state object
@@ -256,6 +317,7 @@ document.addEventListener("DOMContentLoaded", () => {
             focusMode: storageData.isFocusModeEnabled,
             strictMode: storageData.isStrictModeEnabled,
             volume: storageData.volume,
+            filters: storageData.filters,
          };
 
          // Apply local state immediately
@@ -288,6 +350,222 @@ document.addEventListener("DOMContentLoaded", () => {
    })();
 
    // --- EVENT LISTENERS ---
+
+   // FILTER LISTENERS (DEBOUNCED)
+   const sendFilterUpdate = async (filters) => {
+      await sendMessage({ action: "SET_FILTERS", filters });
+   };
+
+   if (elements.filterBrightness) {
+      elements.filterBrightness.addEventListener("input", (e) => {
+         elements.valBrightness.textContent = `${e.target.value}%`;
+         sendFilterUpdate({ brightness: parseInt(e.target.value) });
+      });
+   }
+   if (elements.filterContrast) {
+      elements.filterContrast.addEventListener("input", (e) => {
+         elements.valContrast.textContent = `${e.target.value}%`;
+         sendFilterUpdate({ contrast: parseInt(e.target.value) });
+      });
+   }
+   if (elements.filterSaturation) {
+      elements.filterSaturation.addEventListener("input", (e) => {
+         elements.valSaturation.textContent = `${e.target.value}%`;
+         sendFilterUpdate({ saturation: parseInt(e.target.value) });
+      });
+   }
+   if (elements.filterGrayscale) {
+      elements.filterGrayscale.addEventListener("change", (e) => {
+         sendFilterUpdate({ grayscale: e.target.checked });
+      });
+   }
+   if (elements.filterInvert) {
+      elements.filterInvert.addEventListener("change", (e) => {
+         sendFilterUpdate({ invert: e.target.checked });
+      });
+   }
+   if (elements.btnRotate) {
+      elements.btnRotate.addEventListener("click", () => {
+         // We need current state to rotate increments.
+         // Since we don't have local state easily sync'd here without reading UI, we can just send "INCREMENT_ROTATE" or manage it carefully.
+         // Better: fetch current from UI (if we stored it) or rely on sync.
+      });
+   }
+   // Improved Rotate Logic:
+   // We rely on `updateUI` to keep `currentFilters` in scope?
+   // No, simpler:
+   elements.btnRotate.onclick = async () => {
+      // Get current rotation from content script first to be safe? Or trust local storage?
+      // Let's query state first.
+      const current = await sendMessage({ action: "GET_STATE" });
+      let deg = 0;
+      if (current && current.filters) {
+         deg = current.filters.rotate || 0;
+      }
+      deg = (deg + 90) % 360;
+      await sendMessage({ action: "SET_FILTERS", filters: { rotate: deg } });
+   };
+
+   // --- Collapsible Logic ---
+   if (elements.headerCinemaMode && elements.contentCinemaMode) {
+      elements.headerCinemaMode.addEventListener("click", (e) => {
+         // Don't toggle if clicking reset button
+         if (e.target.closest("#btn-reset-filters")) return;
+
+         const content = elements.contentCinemaMode;
+         const chevron = elements.headerCinemaMode.querySelector(".chevron-icon");
+
+         const isExpanded = content.style.display !== "none";
+         content.style.display = isExpanded ? "none" : "block";
+         if (chevron) {
+            chevron.style.transform = isExpanded ? "rotate(0deg)" : "rotate(180deg)";
+         }
+      });
+
+      // Initialize State based on whether filters are active
+      // We do this inside updateUI or here if we have state access.
+      // Handled in updateUI via a check.
+   }
+
+   // Helper function for Cinema Mode State
+   const checkCinemaModeActive = (filters) => {
+      if (!filters) return false;
+      return (
+         filters.brightness !== 100 ||
+         filters.contrast !== 100 ||
+         filters.saturation !== 100 ||
+         filters.grayscale ||
+         filters.invert ||
+         (filters.rotate && filters.rotate !== 0)
+      );
+   };
+
+   if (elements.btnPip) {
+      elements.btnPip.addEventListener("click", async (e) => {
+         e.stopPropagation();
+         const res = await sendMessage({ action: "TOGGLE_PIP" });
+         if (res && res.error) {
+            console.error("PiP failed", res.error);
+            elements.btnPip.textContent = "Error";
+         } else {
+            // Toggle active state
+            const isActive = res && res.active;
+            elements.btnPip.textContent = isActive ? "Close PiP" : "Open PiP";
+            if (isActive) {
+               elements.btnPip.style.background = "#ff5555";
+               elements.btnPip.style.borderColor = "#ff5555";
+               elements.btnPip.style.color = "white";
+            } else {
+               elements.btnPip.style.background = "rgba(255,255,255,0.1)";
+               elements.btnPip.style.borderColor = "rgba(255,255,255,0.1)";
+               elements.btnPip.style.color = "";
+            }
+         }
+      });
+   }
+
+   if (elements.btnToggleZapper) {
+      let isZapping = false;
+      elements.btnToggleZapper.addEventListener("click", async () => {
+         const nextState = !isZapping;
+         const res = await sendMessage({ action: "TOGGLE_ZAPPER", enabled: nextState });
+
+         if (!res) {
+            alert(
+               "Could not start Zapper. Please refresh the page and try again. (Note: It doesn't work on official browser pages like chrome://)",
+            );
+            return;
+         }
+
+         isZapping = nextState;
+
+         if (isZapping) {
+            elements.btnToggleZapper.innerHTML = `
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="white">
+                    <path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/>
+                </svg>
+                <span>Stop Magic Wipe</span>`;
+            elements.btnToggleZapper.style.background = "#ff416c";
+            elements.btnToggleZapper.style.boxShadow = "0 4px 15px rgba(255, 65, 108, 0.3)";
+
+            if (elements.zapperStatus) {
+               elements.zapperStatus.textContent = "MAGIC ACTIVE";
+               elements.zapperStatus.style.color = "#00ff7f";
+            }
+            if (elements.zapperLight) {
+               elements.zapperLight.style.background = "#00ff7f";
+               elements.zapperLight.style.animation = "pulse-green 2s infinite";
+            }
+            elements.zapperControls.style.display = "block";
+         } else {
+            elements.btnToggleZapper.innerHTML = `
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="white">
+                    <path d="M7.5,5.6L5,7L6.4,4.5L5,2L7.5,3.4L10,2L8.6,4.5L10,7L7.5,5.6M19.5,15.4L22,14L20.6,16.5L22,19L19.5,17.6L17,19L18.4,16.5L17,14L19.5,15.4M22,2L20.6,4.5L22,7L19.5,5.6L17,7L18.4,4.5L17,2L19.5,3.4L22,2M13.38,12.81L4.41,21.78C4.21,21.97 3.9,21.97 3.71,21.78L2.22,20.29C2.03,20.1 2.03,19.79 2.22,19.59L11.19,10.62L13.38,12.81M14.5,11.69L12.31,9.5L15.04,6.77C15.23,6.58 15.55,6.58 15.74,6.77L17.23,8.26C17.42,8.45 17.42,8.77 17.23,8.96L14.5,11.69Z" />
+                </svg>
+                <span>Start Magic Wipe</span>`;
+            elements.btnToggleZapper.style.background = "linear-gradient(135deg, #6e8efb 0%, #a777e3 100%)";
+            elements.btnToggleZapper.style.boxShadow = "0 4px 15px rgba(110, 142, 251, 0.2)";
+
+            if (elements.zapperStatus) {
+               elements.zapperStatus.textContent = "READY TO SLICE";
+               elements.zapperStatus.style.color = "#ff416c";
+            }
+            if (elements.zapperLight) {
+               elements.zapperLight.style.background = "#ff416c";
+               elements.zapperLight.style.animation = "pulse-red 2s infinite";
+            }
+            elements.zapperControls.style.display = "none";
+         }
+      });
+   }
+
+   if (elements.btnResetZaps) {
+      elements.btnResetZaps.addEventListener("click", async () => {
+         if (confirm("Restore all hidden elements on this site?")) {
+            const res = await sendMessage({ action: "CLEAR_ZAPS" });
+            if (res && res.success) {
+               alert("All elements restored! Page will reload to apply changes.");
+               const tab = await getActiveTab();
+               if (tab && tab.id) chrome.tabs.reload(tab.id);
+            }
+         }
+      });
+   }
+
+   if (elements.btnFactoryReset) {
+      elements.btnFactoryReset.addEventListener("click", async () => {
+         const confirmReset = confirm(
+            "⚠️ DANGER ZONE: This will wipe ALL settings, zaps, and focus keywords across ALL websites. You cannot undo this.\n\nAre you absolutely sure?",
+         );
+
+         if (confirmReset) {
+            chrome.storage.local.clear(() => {
+               alert("Factory Reset Complete! All settings have been restored to default.");
+               // Reload extension or just the page
+               location.reload();
+               // Also reload the active tab to clear injected styles
+               getActiveTab().then((tab) => {
+                  if (tab && tab.id) chrome.tabs.reload(tab.id);
+               });
+            });
+         }
+      });
+   }
+
+   if (elements.btnResetFilters) {
+      elements.btnResetFilters.addEventListener("click", async () => {
+         const defaults = {
+            brightness: 100,
+            contrast: 100,
+            saturation: 100,
+            grayscale: false,
+            invert: false,
+            rotate: 0,
+         };
+         updateUI({ filters: defaults }); // Optimistic
+         await sendMessage({ action: "SET_FILTERS", filters: defaults });
+      });
+   }
 
    elements.speedButtons.forEach((btn) => {
       btn.addEventListener("click", async () => {

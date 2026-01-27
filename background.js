@@ -1,4 +1,3 @@
-// Background Service Worker for Universal Ad Blocker
 // Handles network-level blocking, statistics, and cross-tab communication
 
 // ============================================================================
@@ -48,6 +47,17 @@ const initialize = async () => {
    // Set up listeners
    setupMessageListeners();
    setupRequestListeners();
+
+   // CLEAR ALL DYNAMIC RULES (Fix for YouTube detection)
+   // We want to ensure no stale rules are blocking ads
+   if (chrome.declarativeNetRequest) {
+      const dynamicRules = await chrome.declarativeNetRequest.getDynamicRules();
+      const dynamicIds = dynamicRules.map((rule) => rule.id);
+      await chrome.declarativeNetRequest.updateDynamicRules({
+         removeRuleIds: dynamicIds,
+      });
+      console.log("[Universal Ad Blocker] Cleared all dynamic rules.");
+   }
 
    // Update badge
    updateBadge();
@@ -246,8 +256,12 @@ const setupRequestListeners = () => {
 
 const setupMessageListeners = () => {
    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      // Return true immediately to indicate async response
       handleMessage(request, sender)
-         .then(sendResponse)
+         .then((response) => {
+            // Send response only if the port is still open (implicit check)
+            sendResponse(response);
+         })
          .catch((error) => {
             console.error("[Universal Ad Blocker] Message handler error:", error);
             sendResponse({ success: false, error: error.message });
@@ -359,9 +373,12 @@ chrome.action.onClicked.addListener(async (tab) => {
 // ============================================================================
 
 // Save stats every 5 minutes
-setInterval(() => {
-   saveStats();
-}, 5 * 60 * 1000);
+setInterval(
+   () => {
+      saveStats();
+   },
+   5 * 60 * 1000,
+);
 
 // ============================================================================
 // STARTUP

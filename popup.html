@@ -179,6 +179,117 @@
                 </div>
             </div>
 
+            <!-- Picture In Picture -->
+            <div class="control-panel"
+                style="background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);">
+                <div class="panel-header" style="margin-bottom:0; padding: 4px 0;">
+                    <div class="icon-wrap" style="background: rgba(255, 60, 60, 0.15); color: #ff5555;">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path
+                                d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z" />
+                        </svg>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:2px;">
+                        <span style="font-weight:600; font-size:13px;">Picture in Picture</span>
+                        <span style="font-size:10px; opacity:0.6; font-weight:400;">Drag anywhere to move</span>
+                    </div>
+
+                    <button class="secondary-btn" id="btn-pip"
+                        style="margin-left: auto; padding: 6px 14px; border-radius: 20px; font-weight:600; font-size:11px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.1); transition:all 0.2s;">
+                        Open PiP
+                    </button>
+                </div>
+            </div>
+
+            <!-- Video Enhancer (Cinema Mode) -->
+            <div class="control-panel">
+                <div class="panel-header collapsible-header" id="header-cinema-mode" style="cursor: pointer;">
+                    <div class="icon-wrap">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                            <path
+                                d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+                        </svg>
+                    </div>
+                    <span>Cinema Mode</span>
+                    <div class="header-actions" style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+                        <button id="btn-reset-filters" class="icon-btn" title="Reset Filters"
+                            style="width:24px; height:24px; display:none;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                <path
+                                    d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" />
+                            </svg>
+                        </button>
+                        <svg class="chevron-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"
+                            style="transition: transform 0.2s;">
+                            <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div id="content-cinema-mode" style="padding: 0 4px; display: none; margin-top: 10px;">
+                    <!-- Brightness -->
+                    <div style="margin-bottom: 8px;">
+                        <div
+                            style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; opacity:0.8;">
+                            <span>Brightness</span>
+                            <span id="val-brightness">100%</span>
+                        </div>
+                        <input type="range" id="filter-brightness" min="0" max="200" value="100" style="width:100%;">
+                    </div>
+
+                    <!-- Contrast -->
+                    <div style="margin-bottom: 8px;">
+                        <div
+                            style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; opacity:0.8;">
+                            <span>Contrast</span>
+                            <span id="val-contrast">100%</span>
+                        </div>
+                        <input type="range" id="filter-contrast" min="0" max="200" value="100" style="width:100%;">
+                    </div>
+
+                    <!-- Saturation -->
+                    <div style="margin-bottom: 8px;">
+                        <div
+                            style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; opacity:0.8;">
+                            <span>Saturation</span>
+                            <span id="val-saturation">100%</span>
+                        </div>
+                        <input type="range" id="filter-saturation" min="0" max="200" value="100" style="width:100%;">
+                    </div>
+
+                    <!-- Adjustments & Rotate -->
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:11px; opacity:0.8;">Grayscale</span>
+                            <label class="toggle-switch" style="transform:scale(0.8); transform-origin:left center;">
+                                <input type="checkbox" id="filter-grayscale">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:11px; opacity:0.8;">Invert</span>
+                            <label class="toggle-switch" style="transform:scale(0.8); transform-origin:left center;">
+                                <input type="checkbox" id="filter-invert">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:12px; margin-bottom: 4px;">
+                        <button id="btn-rotate" class="secondary-btn full-width" style="font-size:11px; padding:6px;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"
+                                style="margin-right:6px;">
+                                <path
+                                    d="M7.11 8.53L5.7 7.11C4.8 8.27 4.24 9.61 4.07 11h2.02c.14-.87.49-1.72 1.02-2.47zM6.09 13H4.07c.17 1.39.72 2.73 1.62 3.89l1.41-1.42c-.52-.75-.87-1.59-1.01-2.47zm1.01 5.32c1.16.9 2.51 1.44 3.9 1.61V17.9c-.87-.15-1.71-.49-2.46-1.03L7.1 18.32zM13 4.07V1L8.45 5.55 13 10V6.09c2.84.48 5 2.94 5 5.91s-2.16 5.43-5 5.91v2.02c3.95-.49 7-3.85 7-7.93s-3.05-7.44-7-7.93z" />
+                            </svg>
+                            Rotate Video (90°)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Screenshot Capture -->
             <div class="control-panel">
                 <div class="panel-header">
@@ -244,6 +355,67 @@
                             </svg>
                             Print
                         </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page Eraser (The Zapper) -->
+            <div class="tool-section zapper-premium"
+                style="margin-top: 24px; padding: 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+                <div class="section-header"
+                    style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div class="icon-wrap"
+                            style="background: linear-gradient(135deg, #6e8efb 0%, #a777e3 100%); width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(110, 142, 251, 0.3);">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="white">
+                                <path
+                                    d="M7.5,5.6L5,7L6.4,4.5L5,2L7.5,3.4L10,2L8.6,4.5L10,7L7.5,5.6M19.5,15.4L22,14L20.6,16.5L22,19L19.5,17.6L17,19L18.4,16.5L17,14L19.5,15.4M22,2L20.6,4.5L22,7L19.5,5.6L17,7L18.4,4.5L17,2L19.5,3.4L22,2M13.38,12.81L4.41,21.78C4.21,21.97 3.9,21.97 3.71,21.78L2.22,20.29C2.03,20.1 2.03,19.79 2.22,19.59L11.19,10.62L13.38,12.81M14.5,11.69L12.31,9.5L15.04,6.77C15.23,6.58 15.55,6.58 15.74,6.77L17.23,8.26C17.42,8.45 17.42,8.77 17.23,8.96L14.5,11.69Z" />
+                            </svg>
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            <span style="font-weight: 700; font-size: 14px; color: #fff; letter-spacing: 0.02em;">Visual
+                                Magic Wipe</span>
+                            <div style="display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+                                <div id="zapper-light"
+                                    style="width: 6px; height: 6px; border-radius: 50%; background: #ff416c; animation: pulse-red 2s infinite;">
+                                </div>
+                                <span id="zapper-status"
+                                    style="font-size: 10px; color: #ff416c; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">READY
+                                    TO SLICE</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="btn-reset-zaps" title="Restore all zapped items on this site"
+                        style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); cursor: pointer; padding: 6px; border-radius: 8px; transition: all 0.2s;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path
+                                d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="zapper-info"
+                    style="font-size: 11px; color: rgba(255,255,255,0.5); margin-bottom: 20px; line-height: 1.5; padding: 0 4px;">
+                    Experience a cleaner web. Click any distraction (ads, banners, sidebars) to make it disappear
+                    forever from this site.
+                </div>
+
+                <div style="display: flex; gap: 8px;">
+                    <button id="btn-toggle-zapper" class="primary-btn"
+                        style="flex: 1; background: linear-gradient(135deg, #6e8efb 0%, #a777e3 100%); border: none; height: 42px; border-radius: 10px; font-weight: 700; font-size: 13px; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 15px rgba(110, 142, 251, 0.2);">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="white">
+                            <path
+                                d="M7.5,5.6L5,7L6.4,4.5L5,2L7.5,3.4L10,2L8.6,4.5L10,7L7.5,5.6M19.5,15.4L22,14L20.6,16.5L22,19L19.5,17.6L17,19L18.4,16.5L17,14L19.5,15.4M22,2L20.6,4.5L22,7L19.5,5.6L17,7L18.4,4.5L17,2L19.5,3.4L22,2M13.38,12.81L4.41,21.78C4.21,21.97 3.9,21.97 3.71,21.78L2.22,20.29C2.03,20.1 2.03,19.79 2.22,19.59L11.19,10.62L13.38,12.81M14.5,11.69L12.31,9.5L15.04,6.77C15.23,6.58 15.55,6.58 15.74,6.77L17.23,8.26C17.42,8.45 17.42,8.77 17.23,8.96L14.5,11.69Z" />
+                        </svg>
+                        <span>Start Magic Wipe</span>
+                    </button>
+                </div>
+
+                <div id="zapper-controls" style="display: none; margin-top: 14px; animation: fadeIn 0.3s ease;">
+                    <div
+                        style="background: rgba(255, 65, 108, 0.1); padding: 8px; border-radius: 8px; border: 1px solid rgba(255, 65, 108, 0.2); text-align: center;">
+                        <span style="font-size: 10px; color: #ff416c; font-weight: 600;">ESC to Finish • Click anything
+                            to erase</span>
                     </div>
                 </div>
             </div>
@@ -478,6 +650,39 @@
                             </svg>
                             <span>Website</span>
                         </a>
+
+                        <!-- Buy Me a Coffee (Compact) -->
+                        <a href="https://www.buymeacoffee.com/bhargav1997" target="_blank" class="help-link"
+                            style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; background: rgba(255,213,95,0.15); border: 1px solid rgba(255,213,95,0.3); border-radius: 4px; text-decoration: none; color: #FFDD00; transition: all 0.2s; font-size: 11px;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                <path
+                                    d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 5h-2V5h2v3zM17 12c0 1.1-.9 2-2 2H9c-1.1 0-2-.9-2-2V5h10v7z" />
+                            </svg>
+                            <span>Support</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="setting-card"
+                    style="margin-top: 24px; border: 1px solid rgba(255, 65, 108, 0.2); background: rgba(255, 65, 108, 0.05);">
+                    <div class="setting-row" style="padding: 12px;">
+                        <div class="setting-label">
+                            <div class="icon-wrap" style="background: #ff416c;">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                    <path
+                                        d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z" />
+                                </svg>
+                            </div>
+                            <div class="text-col">
+                                <span class="primary" style="color: #ff416c;">Factory Reset</span>
+                                <span class="secondary">Wipe all zaps, settings & stats</span>
+                            </div>
+                        </div>
+                        <button id="btn-factory-reset" class="secondary-btn"
+                            style="border-color: #ff416c; color: #ff416c; padding: 6px 12px; font-size: 11px; min-width: 80px;">
+                            Reset All
+                        </button>
                     </div>
                 </div>
 
