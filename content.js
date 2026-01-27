@@ -389,16 +389,31 @@ if (currentSite.type === "youtube") {
          this.currentVideo = null;
          this.videoEndListener = null;
          this.urlObserver = null;
-         this.lastURL = null; // Track URL changes
-         this.lastScrollTime = 0; // Track last scroll time for cooldown
+         this.lastURL = null;
+         this.lastScrollTime = 0;
+         this.scrolling = false; // Lock for race prevention
+         this.bindingInterval = null;
          this.init();
       }
 
       init() {
-         // Monitor URL changes for Shorts navigation
          this.observeURLChanges();
-         // Check if already on Shorts
          this.checkForVideo();
+         // Periodic validation of video binding presence (fix for lost listeners)
+         this.bindingInterval = setInterval(() => this.validateVideoBinding(), 500);
+      }
+
+      validateVideoBinding() {
+         // If we are on shorts but have no video or video changed underneath us
+         if (!window.location.pathname.includes("/shorts/")) return;
+         const video = getVideo();
+         if (!video) return;
+
+         if (video !== this.currentVideo) {
+            console.log("[Auto-Scroll] 🔄 Video element replaced, re-binding...");
+            this.currentVideo = video;
+            this.setupVideoListener(video);
+         }
       }
 
       observeURLChanges() {
@@ -428,241 +443,267 @@ if (currentSite.type === "youtube") {
       }
 
       setupVideoListener(video) {
+         if (this.videoEndListener && this.currentVideo) {
+            this.currentVideo.removeEventListener("ended", this.videoEndListener);
+            this.currentVideo.removeEventListener("timeupdate", this.timeUpdateListener);
+         }
+
+         this.hasTriggered = false;
+         this.adSkipTriggered = false;
+         this.lastVideoTime = 0;
+
+         this.videoEndListener = () => {
+            if (this.canScroll()) {
+               console.log("[Auto-Scroll] ✅ Ended event -> Scrolling");
+               this.scrollToNextShort();
+            }
+         };
+
+         this.timeUpdateListener = () => {
+            if (this.currentVideo) {
+               this.handleTimeUpdate(this.currentVideo);
+            }
+         };
+
+         video.addEventListener("ended", this.videoEndListener);
+         video.addEventListener("timeupdate", this.timeUpdateListener);
+         console.log("[Auto-Scroll] Listeners active for", video.src);
+      }
+
+      _setupVideoListener_unused(video) {
          // Remove old listeners
          if (this.videoEndListener && this.currentVideo) {
             this.currentVideo.removeEventListener("ended", this.videoEndListener);
             this.currentVideo.removeEventListener("timeupdate", this.timeUpdateListener);
          }
 
-         // Reset trigger flag
+         // Reset flags
          this.hasTriggered = false;
+         this.adSkipTriggered = false;
+         this.lastVideoTime = 0;
 
-         // Listener for video end
-         this.videoEndListener = () => this.onVideoEnd();
+         // Unified scroll triggers
+         this.videoEndListener = () => {
+            if (this.canScroll()) {
+               console.log("[Auto-Scroll] ✅ Ended event -> Scrolling");
+               this.scrollToNextShort();
+            }
+         };
          video.addEventListener("ended", this.videoEndListener);
 
-         // Listener for timeupdate (for looping videos that don't fire 'ended')
+         // "Timeupdate" listener for looping Shorts
+         // Strategy: Detect when video loops (timestamp resets) OR reaches very end
          this.timeUpdateListener = () => {
-            // Check if URL changed (new Short)
-            const currentURL = window.location.pathname;
-            if (currentURL !== this.lastURL) {
-               this.lastURL = currentURL;
-               this.hasTriggered = false; // Reset flag on new Short
-               this.adSkipTriggered = false; // Reset ad skip flag
-               console.log("[Auto-Scroll] New Short detected, flag reset");
-            }
+            const video = this.currentVideo;
+            if (!video || !video.duration) return;
 
-            if (this.hasTriggered) return;
-
-            // Check if current Short is an ad and auto-skip
+            // 1. Detect Ad and Skip
             if (this.state.isAutoScrollShortsEnabled && this.isAd()) {
                if (!this.adSkipTriggered) {
                   this.adSkipTriggered = true;
-                  console.log("[Auto-Scroll] 🚫 Ad detected, skipping in 1s...");
-                  setTimeout(() => {
-                     this.scrollToNextShort();
-                  }, 1000); // Wait 1s before skipping ad
+                  console.log("[Auto-Scroll] 🚫 Ad detected, scrolling...");
+                  this.scrollToNextShort(true); // Force skip
                }
                return;
             }
 
-            const video = this.currentVideo;
-            if (!video || !video.duration) return;
+            // 2. Logic for regular Shorts
+            const currentTime = video.currentTime;
+            const duration = video.duration;
 
-            // Check if within 0.5 seconds of end
-            const timeRemaining = video.duration - video.currentTime;
-            if (timeRemaining > 0 && timeRemaining < 0.5) {
-               this.hasTriggered = true;
-               this.onVideoEnd();
+            // Loop Detection Logic:
+            // 1. Check for significant time reversal (current time is much less than last time)
+            // This catches almost all loops regardless of duration percentages.
+            // We ignore small seeks/scrubs (e.g. going back 1 second) by checking if we were relatively far in the video.
+            if (this.lastVideoTime > 5.0 && currentTime < 1.0) {
+               if (!this.hasTriggered && this.state.isAutoScrollShortsEnabled) {
+                  console.log("[Auto-Scroll] 🔄 Loop detected (generic time reversal), scrolling...");
+                  this.hasTriggered = true;
+                  this.scrollToNextShort();
+               }
             }
-         };
-         video.addEventListener("timeupdate", this.timeUpdateListener);
 
-         console.log("[Auto-Scroll] Listeners attached to video");
+            // 2. Percentage based check (for shorter videos)
+            const isNearEnd = this.lastVideoTime > duration * 0.85;
+            const isNearStart = currentTime < duration * 0.15;
+
+            if (isNearEnd && isNearStart) {
+               if (!this.hasTriggered && this.state.isAutoScrollShortsEnabled) {
+                  console.log("[Auto-Scroll] 🔄 Loop detected (percentage jump), scrolling...");
+                  this.hasTriggered = true;
+                  this.scrollToNextShort();
+               }
+            }
+
+            // Fallback: If we are extremely close to the end (0.25s), trigger.
+            // Some videos pause at the end instead of looping triggers.
+            if (!this.hasTriggered && this.state.isAutoScrollShortsEnabled) {
+               const timeRemaining = duration - currentTime;
+               // Relaxed to 0.25s and removed !video.paused check as sometimes it reports paused right before end
+               if (timeRemaining > 0 && timeRemaining < 0.25) {
+                  console.log("[Auto-Scroll] ⏱️ Near end detected, scrolling...");
+                  this.hasTriggered = true;
+                  this.scrollToNextShort();
+               }
+            }
+
+            this.lastVideoTime = currentTime;
+         };
+
+         video.addEventListener("timeupdate", this.timeUpdateListener);
+         console.log("[Auto-Scroll] Listeners attached to video", video.src);
       }
 
       onVideoEnd() {
-         if (!this.state.isAutoScrollShortsEnabled) {
-            console.log("[Auto-Scroll] Feature disabled");
+         // Deprecated in favor of inline listener above, but kept if needed for legacy calls.
+         if (this.canScroll()) {
+            console.log("[Auto-Scroll] ✅ Ended event (legacy) -> Scrolling");
+            this.scrollToNextShort();
+         }
+      }
+
+      handleTimeUpdate(video) {
+         if (!this.state.isAutoScrollShortsEnabled) return;
+         if (this.hasTriggered) return;
+
+         if (!video || !video.duration) return;
+
+         // 1. Ad Detection (Highest Priority)
+         if (this.isAd()) {
+            if (this.canScroll(true)) {
+               // force=true for ads
+               console.log("[Auto-Scroll] 🚫 Ad detected -> Skipping");
+               this.scrollToNextShort(true);
+            }
             return;
          }
 
-         console.log("[Auto-Scroll] Video ended, scrolling to next...");
+         const currentTime = video.currentTime;
+         const duration = video.duration;
 
-         // Small delay for UI to update
+         // 2. Loop Detection
+         // Generic time reversal (catch-all for loops)
+         if (this.lastVideoTime > 5.0 && currentTime < 1.0) {
+            if (this.canScroll()) {
+               console.log("[Auto-Scroll] 🔄 Loop (Time Jump) -> Scrolling");
+               this.scrollToNextShort();
+            }
+         }
+         // Percentage based loop (short videos)
+         else if (this.lastVideoTime > duration * 0.85 && currentTime < duration * 0.15) {
+            if (this.canScroll()) {
+               console.log("[Auto-Scroll] 🔄 Loop (%) -> Scrolling");
+               this.scrollToNextShort();
+            }
+         }
+         // 3. Near End Detection (Fallback for pause-at-end)
+         else {
+            const timeRemaining = duration - currentTime;
+            if (timeRemaining > 0 && timeRemaining < 0.25) {
+               if (this.canScroll()) {
+                  console.log("[Auto-Scroll] ⏱️ Near End -> Scrolling");
+                  this.scrollToNextShort();
+               }
+            }
+         }
+
+         this.lastVideoTime = currentTime;
+      }
+
+      // CENTRAL GATEKEEPER
+      canScroll(force = false) {
+         if (!this.state.isAutoScrollShortsEnabled) return false;
+
+         // Prevent double fires
+         if (this.scrolling) return false;
+
+         // Cooldown Check
+         const now = Date.now();
+
+         // Adaptive cooldown:
+         // For very short videos (e.g. 5s), 1.5s cooldown is fine.
+         // For ads (force=true), we want fast skip (0.3s).
+         // Standard: 1.2s to prevent accidental double skips.
+         let limit = force ? 300 : 1200;
+
+         if (now - this.lastScrollTime < limit) {
+            return false;
+         }
+
+         this.scrolling = true;
+         this.lastScrollTime = now;
+         // We do NOT set hasTriggered here, because hasTriggered is per-video for loops.
+         // Wait, actually hasTriggered IS setting in setupVideoListener loop.
+         // Let's rely on setupVideoListener logic to set hasTriggered=true when it scrolls.
+
+         // Release lock after a bit (allow next video to scroll)
          setTimeout(() => {
-            this.scrollToNextShort();
-         }, 500);
+            this.scrolling = false;
+         }, 800);
+
+         return true;
       }
 
       isAd() {
-         // Find the container for the CURRENT video only
          const video = this.currentVideo;
          if (!video) return false;
-
-         // find identifying parent container
-         const container = video.closest("ytd-reel-video-renderer") || video.closest("ytd-shorts");
+         const container = video.closest("ytd-reel-video-renderer");
          if (!container) return false;
 
-         // Check for Shorts ad indicators WITHIN the current container
-         const adSelectors = [
-            "reels-ad-card-buttoned-view-model",
-            "ad-badge-view-model",
-            "yt-ad-metadata-shape",
-            ".ytwReelsAdCardButtonedViewModelHost",
-            "badge-shape.yt-badge-shape--ad",
+         let signals = 0;
+         // Attribute check
+         if (container.hasAttribute("is-ad")) signals += 2; // Strong signal
+         if (container.querySelector("ytd-ad-slot-renderer")) signals += 2;
 
-            // Structural component selectors
-            "ytd-in-feed-ad-layout-renderer",
-            "reels-ad-metadata-view-model",
-            "ad-button-view-model",
-            ".ytwAdBadgeViewModelHost",
-         ];
-
-         for (const selector of adSelectors) {
-            if (container.querySelector(selector)) {
-               console.log("[Auto-Scroll] Ad detected via:", selector);
-               return true;
-            }
-         }
-
-         return false;
-      }
-
-      scrollToNextShort() {
-         // Global cooldown: prevent scrolling more than once every 2 seconds
-         const now = Date.now();
-         const timeSinceLastScroll = now - this.lastScrollTime;
-
-         if (timeSinceLastScroll < 2000) {
-            console.log("[Auto-Scroll] ⏸️ Cooldown active, skipping scroll");
-            return;
-         }
-
-         this.lastScrollTime = now;
-
-         // Try multiple methods in order of reliability
-
-         // Method 1: Click YouTube's next button (most reliable)
-         if (this.clickNextButton()) {
-            console.log("[Auto-Scroll] ✓ Clicked next button");
-            return;
-         }
-
-         // Method 2: Simulate swipe gesture
-         if (this.simulateSwipe()) {
-            console.log("[Auto-Scroll] ✓ Simulated swipe");
-            return;
-         }
-
-         // Method 3: Scroll container
-         if (this.scrollContainer()) {
-            console.log("[Auto-Scroll] ✓ Scrolled container");
-            return;
-         }
-
-         // Method 4: Arrow key fallback
-         this.simulateArrowKey();
-         console.log("[Auto-Scroll] ✓ Simulated arrow key");
-      }
-
-      clickNextButton() {
-         const selectors = [
-            'button[aria-label="Next video"]',
-            'button[aria-label*="Next"]',
-            "#navigation-button-down button",
-            "button.ytp-next-button",
-            ".navigation-button.next",
-         ];
-
-         for (const selector of selectors) {
-            const button = document.querySelector(selector);
-            if (button && !button.disabled) {
-               button.click();
-               return true;
-            }
-         }
-
-         return false;
-      }
-
-      simulateSwipe() {
-         const container = document.querySelector("ytd-reel-video-renderer, #shorts-container");
-
-         if (!container) return false;
-
-         try {
-            // Create touch events for swipe down
-            const touch = new Touch({
-               identifier: Date.now(),
-               target: container,
-               clientX: window.innerWidth / 2,
-               clientY: window.innerHeight / 2,
-               radiusX: 2.5,
-               radiusY: 2.5,
-               rotationAngle: 0,
-               force: 0.5,
-            });
-
-            const touchStart = new TouchEvent("touchstart", {
-               touches: [touch],
-               targetTouches: [touch],
-               changedTouches: [touch],
-               bubbles: true,
-               cancelable: true,
-            });
-
-            const touchEnd = new TouchEvent("touchend", {
-               touches: [],
-               targetTouches: [],
-               changedTouches: [touch],
-               bubbles: true,
-               cancelable: true,
-            });
-
-            container.dispatchEvent(touchStart);
-            setTimeout(() => container.dispatchEvent(touchEnd), 50);
-
-            return true;
-         } catch (e) {
-            return false;
-         }
-      }
-
-      scrollContainer() {
-         const selectors = ["ytd-reel-video-renderer", "#shorts-container", "ytd-shorts", ".reel-video-in-sequence"];
-
-         for (const selector of selectors) {
-            const container = document.querySelector(selector);
-            if (container) {
-               container.scrollBy({
-                  top: window.innerHeight,
-                  behavior: "smooth",
-               });
-               return true;
-            }
-         }
-
-         return false;
-      }
-
-      simulateArrowKey() {
-         document.dispatchEvent(
-            new KeyboardEvent("keydown", {
-               key: "ArrowDown",
-               code: "ArrowDown",
-               keyCode: 40,
-               which: 40,
-               bubbles: true,
-               cancelable: true,
-            }),
+         // Badge text check
+         const badges = container.querySelectorAll(
+            ".badge-style-type-ad, .ytd-ad-badge-renderer, [aria-label='Ad'], [aria-label='Sponsored']",
          );
+         if (badges.length > 0) signals++;
+
+         // Text content check (Sponsored / Ad)
+         const textContent = container.innerText.toLowerCase();
+         if (textContent.includes("#ad") || textContent.includes("sponsored")) {
+            // Weak signal on its own, stronger if combined
+            signals += 0.5;
+         }
+
+         // Action buttons
+         const button = container.querySelector("#action-button");
+         if (button) {
+            const txt = button.textContent.toLowerCase();
+            if (txt.includes("install") || txt.includes("shop") || txt.includes("sign up")) signals++;
+         }
+
+         return signals >= 1.5; // Require at least one strong signal or multiple weak ones
+      }
+
+      scrollToNextShort(force = false) {
+         // 1. Keyboard Navigation (Most Reliable)
+         console.log("[Auto-Scroll] ⌨️ Sending ArrowDown");
+         const downEvent = new KeyboardEvent("keydown", {
+            key: "ArrowDown",
+            code: "ArrowDown",
+            keyCode: 40,
+            bubbles: true,
+            cancelable: true,
+         });
+         document.body.dispatchEvent(downEvent);
+
+         // 2. Button Fallback (If keyboard blocked)
+         setTimeout(() => {
+            const navBtn = document.querySelector("#navigation-button-down button");
+            if (navBtn) {
+               navBtn.click();
+            }
+         }, 50);
       }
 
       destroy() {
          if (this.urlObserver) {
             this.urlObserver.disconnect();
          }
+         if (this.bindingInterval) clearInterval(this.bindingInterval);
          if (this.videoEndListener && this.currentVideo) {
             this.currentVideo.removeEventListener("ended", this.videoEndListener);
             this.currentVideo.removeEventListener("timeupdate", this.timeUpdateListener);
@@ -1723,31 +1764,39 @@ if (currentSite.type === "youtube") {
             break;
          case "TOGGLE_AUTO_SKIP":
             state.isAutoSkipEnabled = request.enabled;
+            // Persist setting
+            chrome.storage.local.set({ isAutoSkipEnabled: state.isAutoSkipEnabled });
             needSave = true;
             sendResponse({ success: true });
             break;
          case "TOGGLE_SPEED_ADS":
             state.isSpeedAdEnabled = request.enabled;
+            chrome.storage.local.set({ isSpeedAdEnabled: state.isSpeedAdEnabled });
             needSave = true;
             sendResponse({ success: true });
             break;
          case "TOGGLE_ZEN_MODE":
             toggleZenMode(request.enabled);
+            // Saved within toggleZenMode logic via state, but let's be explicit
+            chrome.storage.local.set({ isZenModeEnabled: state.isZenModeEnabled });
             needSave = true;
             sendResponse({ success: true });
             break;
          case "TOGGLE_BOOSTER":
             state.isBoosterEnabled = request.enabled;
+            chrome.storage.local.set({ isBoosterEnabled: state.isBoosterEnabled });
             needSave = true;
             sendResponse({ success: true });
             break;
          case "TOGGLE_AUTO_SCROLL_SHORTS":
             state.isAutoScrollShortsEnabled = request.enabled;
+            chrome.storage.local.set({ isAutoScrollShortsEnabled: state.isAutoScrollShortsEnabled });
             needSave = true;
             sendResponse({ success: true });
             break;
          case "SET_VOLUME":
             setVolume(parseFloat(request.value));
+            chrome.storage.local.set({ volume: state.volume });
             needSave = true;
             sendResponse({ success: true });
             break;
@@ -1787,6 +1836,7 @@ if (currentSite.type === "youtube") {
          // KEYWORD HANDLERS
          case "TOGGLE_FOCUS_MODE":
             state.isFocusModeEnabled = request.enabled;
+            chrome.storage.local.set({ isFocusModeEnabled: state.isFocusModeEnabled });
             if (state.isFocusModeEnabled) {
                runFocusFilter();
             } else {
@@ -1799,6 +1849,7 @@ if (currentSite.type === "youtube") {
             break;
          case "TOGGLE_STRICT_MODE":
             state.isStrictModeEnabled = request.enabled;
+            chrome.storage.local.set({ isStrictModeEnabled: state.isStrictModeEnabled });
             // Rerun filter to update styles
             document.querySelectorAll("[data-yqs-filtered='true']").forEach((el) => {
                // Reset state and re-process
@@ -1814,6 +1865,7 @@ if (currentSite.type === "youtube") {
          case "ADD_KEYWORD":
             if (request.word && !state.focusKeywords.includes(request.word)) {
                state.focusKeywords.push(request.word);
+               chrome.storage.local.set({ focusKeywords: state.focusKeywords });
                runFocusFilter();
                needSave = true;
             }
@@ -1821,6 +1873,7 @@ if (currentSite.type === "youtube") {
             break;
          case "REMOVE_KEYWORD":
             state.focusKeywords = state.focusKeywords.filter((k) => k !== request.word);
+            chrome.storage.local.set({ focusKeywords: state.focusKeywords });
             // Rerun logic might be creating false negatives if we don't un-hide.
             // Simpler to reload or just let the user know changes apply on new content/reload.
             // Actually, let's just save.
@@ -1837,6 +1890,7 @@ if (currentSite.type === "youtube") {
                } else {
                   state.activeCategories = state.activeCategories.filter((c) => c !== request.category);
                }
+               chrome.storage.local.set({ activeCategories: state.activeCategories });
                runFocusFilter();
                needSave = true;
             }
@@ -1848,6 +1902,7 @@ if (currentSite.type === "youtube") {
                const exists = state.customCategories.find((c) => c.id === request.category.id);
                if (!exists) {
                   state.customCategories.push(request.category);
+                  chrome.storage.local.set({ customCategories: state.customCategories });
                   needSave = true;
                }
             }
@@ -1859,6 +1914,10 @@ if (currentSite.type === "youtube") {
                state.customCategories = state.customCategories.filter((c) => c.id !== request.id);
                // Also remove from active
                state.activeCategories = state.activeCategories.filter((c) => c !== request.id);
+               chrome.storage.local.set({
+                  customCategories: state.customCategories,
+                  activeCategories: state.activeCategories,
+               });
                needSave = true;
             }
             sendResponse({ success: true, customCategories: state.customCategories });
@@ -1866,6 +1925,7 @@ if (currentSite.type === "youtube") {
 
          case "TOGGLE_MIRROR":
             toggleMirror(request.enabled);
+            chrome.storage.local.set({ isMirrored: state.isMirrored });
             needSave = true;
             sendResponse({ success: true, isMirrored: state.isMirrored });
             break;
@@ -1903,7 +1963,25 @@ if (currentSite.type === "youtube") {
             });
             break;
       }
-      if (needSave) saveSettings();
+      if (needSave) {
+         saveSettings();
+         chrome.storage.local.set({
+            isAutoSkipEnabled: state.isAutoSkipEnabled,
+            isSpeedAdEnabled: state.isSpeedAdEnabled,
+            isZenModeEnabled: state.isZenModeEnabled,
+            isBoosterEnabled: state.isBoosterEnabled,
+            isAutoScrollShortsEnabled: state.isAutoScrollShortsEnabled,
+            boostSpeed: state.boostSpeed,
+            boostKey: state.boostKey,
+            volume: state.volume,
+            isFocusModeEnabled: state.isFocusModeEnabled,
+            isStrictModeEnabled: state.isStrictModeEnabled,
+            focusKeywords: state.focusKeywords,
+            activeCategories: state.activeCategories,
+            customCategories: state.customCategories,
+            isMirrored: state.isMirrored,
+         });
+      }
       return true;
    });
 } // End of YouTube-only code

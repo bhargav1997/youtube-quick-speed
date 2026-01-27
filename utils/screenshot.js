@@ -32,9 +32,25 @@
    const disableFixedElements = () => {
       const fixedElements = [];
 
-      // Check ALL elements for fixed/sticky positioning
-      document.querySelectorAll("*").forEach((el) => {
+      // Optimize: Only check elements that are likely to be fixed
+      // Avoid scanning the entire DOM tree (*)
+      const candidates = document.querySelectorAll("header, nav, aside, footer, div, section, ytd-masthead, .fixed, .sticky");
+
+      candidates.forEach((el) => {
          try {
+            // fast check for inline styles
+            if (el.style.position === "fixed" || el.style.position === "sticky") {
+               fixedElements.push({
+                  el,
+                  originalDisplay: el.style.display,
+                  originalVisibility: el.style.visibility,
+                  originalPosition: el.style.position,
+               });
+               el.style.setProperty("display", "none", "important");
+               return;
+            }
+
+            // computed style check (expensive, so we limit candidates)
             const style = getComputedStyle(el);
             if (style.position === "fixed" || style.position === "sticky") {
                fixedElements.push({
@@ -72,64 +88,125 @@
       });
    };
 
+   const getScrollContainer = () => {
+      // Try window first
+      if (document.documentElement.scrollHeight > window.innerHeight) {
+         const initialY = window.scrollY;
+         window.scrollTo(0, initialY + 1);
+         if (window.scrollY !== initialY) {
+            window.scrollTo(0, initialY); // Restore
+            return window;
+         }
+      }
+
+      // Find largest scrollable element
+      let maxArea = 0;
+      let container = null;
+
+      // Restrict search to common structural elements to improve performance
+      const candidates = document.querySelectorAll("div, main, section, article, ytd-app");
+
+      candidates.forEach((el) => {
+         if (el.scrollHeight > el.clientHeight && el.clientHeight > 100) {
+            const style = window.getComputedStyle(el);
+            if (/(auto|scroll)/.test(style.overflowY) && style.display !== "none" && style.visibility !== "hidden") {
+               const area = el.clientWidth * el.clientHeight;
+               if (area > maxArea) {
+                  maxArea = area;
+                  container = el;
+               }
+            }
+         }
+      });
+
+      return container || window;
+   };
+
    const captureFullPage = async () => {
-      const originalScrollX = window.scrollX;
-      const originalScrollY = window.scrollY;
+      const scrollContainer = getScrollContainer();
+      const isWindow = scrollContainer === window;
+
+      const originalScrollX = isWindow ? window.scrollX : scrollContainer.scrollLeft;
+      const originalScrollY = isWindow ? window.scrollY : scrollContainer.scrollTop;
 
       try {
          // Disable fixed / sticky elements safely
          const fixedEls = disableFixedElements();
 
-         // Measure full document size
-         const totalHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
-         const totalWidth = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
-
-         // Go to top and let layout settle
-         window.scrollTo(0, 0);
-         await new Promise((r) => setTimeout(r, 400));
-         await forceRepaint();
-
-         // First capture (source of truth)
-         const firstShot = await captureVisible();
-         if (!firstShot) throw new Error("Initial capture failed");
-
-         const firstImg = new Image();
-         await new Promise((res) => {
-            firstImg.onload = res;
-            firstImg.src = firstShot;
-         });
+         // Measure full size
+         const totalHeight = isWindow
+            ? Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)
+            : scrollContainer.scrollHeight;
+         const totalWidth = isWindow
+            ? Math.max(document.documentElement.scrollWidth, document.body.scrollWidth)
+            : scrollContainer.scrollWidth;
 
          const viewportCSSWidth = window.innerWidth;
          const viewportCSSHeight = window.innerHeight;
 
+         // Go to top and let layout settle
+         if (isWindow) {
+            window.scrollTo(0, 0);
+         } else {
+            scrollContainer.scrollTop = 0;
+         }
+
+         await new Promise((r) => setTimeout(r, 400));
+         await forceRepaint();
+
+         // First capture (source of truth for ratio)
+         const firstShot = await captureVisible();
+         if (!firstShot) throw new Error("Initial capture failed - check permissions or reload");
+
+         const firstImg = new Image();
+         await new Promise((res, rej) => {
+            firstImg.onload = res;
+            firstImg.onerror = () => rej(new Error("Failed to load initial capture"));
+            firstImg.src = firstShot;
+         });
+
          const capturedWidth = firstImg.width;
          const capturedHeight = firstImg.height;
 
-         // REAL device pixel ratio
+         // REAL device pixel ratio (handle retina/high-dpi)
          const pixelRatio = capturedWidth / viewportCSSWidth;
+
+         if (!pixelRatio || isNaN(pixelRatio)) {
+            throw new Error("Failed to calculate pixel ratio");
+         }
 
          // REAL CSS height per capture
          const cssCaptureHeight = capturedHeight / pixelRatio;
 
-         // Canvas
+         // Canvas setup
          const canvas = document.createElement("canvas");
          canvas.width = Math.ceil(totalWidth * pixelRatio);
          canvas.height = Math.ceil(totalHeight * pixelRatio);
 
          const ctx = canvas.getContext("2d");
 
+         // Fill with white first (avoid transparent gaps)
+         ctx.fillStyle = "#ffffff";
+         ctx.fillRect(0, 0, canvas.width, canvas.height);
+
          let y = 0;
          let shots = 0;
+         const MAX_SHOTS = 100; // Safety brake
 
-         while (y < totalHeight) {
-            window.scrollTo(0, y);
+         while (y < totalHeight && shots < MAX_SHOTS) {
+            if (isWindow) {
+               window.scrollTo(0, y);
+            } else {
+               scrollContainer.scrollTop = y;
+            }
 
-            // Chrome-safe delay
+            // Chrome-safe delay (increase if misses happen)
             await new Promise((r) => setTimeout(r, 350));
             await forceRepaint();
 
             const shot = await captureVisible();
             if (!shot) {
+               console.warn("[Screenshot] Capture missed at y=" + y);
                y += cssCaptureHeight;
                continue;
             }
@@ -137,25 +214,48 @@
             const img = new Image();
             await new Promise((res) => {
                img.onload = res;
+               img.onerror = res; // Skip bad frames but continue
                img.src = shot;
             });
 
-            const drawHeightCSS = Math.min(cssCaptureHeight, totalHeight - y);
-            const drawHeightPX = Math.floor(drawHeightCSS * pixelRatio);
+            // Calculate draw dimensions
+            // Determine how much of the viewport is actually "new" content vs empty space at bottom
+            const remainingHeight = totalHeight - y;
+            const drawHeightCSS = Math.min(cssCaptureHeight, remainingHeight);
 
-            ctx.drawImage(img, 0, 0, capturedWidth, drawHeightPX, 0, Math.floor(y * pixelRatio), capturedWidth, drawHeightPX);
+            // Adjust for pixel ratio
+            const sourceY = 0; // Always take from top of screenshot
+            const sourceHeight = Math.floor(drawHeightCSS * pixelRatio);
+            const destY = Math.floor(y * pixelRatio);
+
+            // Only draw what's needed
+            if (sourceHeight > 0) {
+               ctx.drawImage(img, 0, sourceY, capturedWidth, sourceHeight, 0, destY, capturedWidth, sourceHeight);
+            }
 
             shots++;
             y += cssCaptureHeight;
          }
 
          restoreFixedElements(fixedEls);
-         window.scrollTo(originalScrollX, originalScrollY);
+
+         if (isWindow) {
+            window.scrollTo(originalScrollX, originalScrollY);
+         } else {
+            scrollContainer.scrollTop = originalScrollY;
+         }
 
          return canvas.toDataURL("image/png");
       } catch (err) {
          console.error("[Screenshot] Full page capture failed:", err);
-         window.scrollTo(originalScrollX, originalScrollY);
+
+         // Restore scroll position
+         if (isWindow) {
+            window.scrollTo(originalScrollX, originalScrollY);
+         } else {
+            scrollContainer.scrollTop = originalScrollY;
+         }
+
          throw err;
       }
    };
@@ -435,5 +535,4 @@
       copyToClipboard,
       printImage,
    };
-
 })();

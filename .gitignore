@@ -1,0 +1,21 @@
+# Chrome Extension Auto-Generated Files
+_metadata/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Build artifacts (if you add a build process)
+dist/
+build/
+*.zip

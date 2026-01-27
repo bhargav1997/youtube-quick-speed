@@ -223,15 +223,56 @@ document.addEventListener("DOMContentLoaded", () => {
    (async () => {
       try {
          const tab = await getActiveTab();
+
+         // 1. Load Local Storage First (Fastest, persists even if content script is asleep)
+         const storageData = await chrome.storage.local.get([
+            "boostKey",
+            "boostSpeed",
+            "isAutoSkipEnabled",
+            "isSpeedAdEnabled",
+            "isZenModeEnabled",
+            "isBoosterEnabled",
+            "isAutoScrollShortsEnabled",
+            "activeCategories",
+            "customCategories",
+            "focusKeywords",
+            "isFocusModeEnabled",
+            "isStrictModeEnabled",
+            "volume",
+         ]);
+
+         // Map storage keys to UI state object
+         const localState = {
+            boostKey: storageData.boostKey,
+            boostSpeed: storageData.boostSpeed,
+            autoSkip: storageData.isAutoSkipEnabled,
+            speedAds: storageData.isSpeedAdEnabled,
+            zenMode: storageData.isZenModeEnabled,
+            booster: storageData.isBoosterEnabled,
+            autoScrollShorts: storageData.isAutoScrollShortsEnabled,
+            activeCategories: storageData.activeCategories,
+            customCategories: storageData.customCategories,
+            keywords: storageData.focusKeywords,
+            focusMode: storageData.isFocusModeEnabled,
+            strictMode: storageData.isStrictModeEnabled,
+            volume: storageData.volume,
+         };
+
+         // Apply local state immediately
+         updateUI(localState);
+
+         // 2. Then check active tab for real-time speed/content data
          if (tab && tab.url && (tab.url.includes("youtube.com") || tab.url.includes("youtu.be"))) {
             chrome.tabs.sendMessage(tab.id, { action: "GET_STATE" }, (response) => {
                elements.displayBadge.classList.remove("clickable", "error");
                if (chrome.runtime.lastError || !response) {
-                  elements.displayBadge.textContent = "Reload Tab";
-                  elements.displayBadge.classList.add("error");
+                  // Content script might be dead or not loaded, but we have local settings
+                  // Only show error if we really need interaction
+                  console.log("Content script not ready:", chrome.runtime.lastError);
                } else {
                   elements.displayBadge.style = "";
-                  updateUI(response);
+                  // Merge: Local storage is truth for settings, Response is truth for runtime (speed, loop)
+                  updateUI({ ...localState, ...response });
                }
             });
          } else {
