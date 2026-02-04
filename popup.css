@@ -1434,22 +1434,138 @@ body {
    -moz-appearance: textfield;
 }
 
-@keyframes fadeIn {
-   from {
-      opacity: 0;
-   }
-   to {
-      opacity: 1;
-   }
+/* ============================================================================
+   FACTORY RESET - AGGRESSIVE DANGER ZONE
+   ============================================================================ */
+
+.danger-zone-container {
+   margin-top: 32px !important;
+   position: relative;
+   padding-top: 10px;
 }
 
-@keyframes slideUp {
-   from {
-      transform: translateY(30px) scale(0.95);
-      opacity: 0;
-   }
-   to {
-      transform: translateY(0) scale(1);
-      opacity: 1;
-   }
+.danger-zone-badge {
+   position: absolute;
+   top: 0;
+   left: 16px;
+   background: #ff416c;
+   color: white;
+   font-size: 8px;
+   font-weight: 900;
+   padding: 2px 8px;
+   border-radius: 4px;
+   letter-spacing: 0.1em;
+   z-index: 2;
+   box-shadow: 0 2px 8px rgba(255, 65, 108, 0.4);
+   text-transform: uppercase;
+}
+
+.danger-zone-card {
+   background: linear-gradient(135deg, rgba(255, 65, 108, 0.1) 0%, rgba(255, 65, 108, 0.03) 100%) !important;
+   border: 1px solid rgba(255, 65, 108, 0.3) !important;
+   border-radius: 14px;
+   padding: 16px;
+   display: flex;
+   align-items: center;
+   gap: 16px;
+   position: relative;
+   overflow: hidden;
+   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.danger-zone-card::before {
+   content: "";
+   position: absolute;
+   top: 0;
+   left: 0;
+   width: 4px;
+   height: 100%;
+   background: #ff416c;
+}
+
+.danger-zone-card:hover {
+   background: linear-gradient(135deg, rgba(255, 65, 108, 0.15) 0%, rgba(255, 65, 108, 0.05) 100%) !important;
+   border-color: rgba(255, 65, 108, 0.5) !important;
+   box-shadow: 0 8px 24px rgba(255, 65, 108, 0.15);
+   transform: translateY(-2px);
+}
+
+.danger-icon-wrap {
+   width: 42px;
+   height: 42px;
+   background: rgba(255, 65, 108, 0.1) !important;
+   border-radius: 10px;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   color: #ff416c !important;
+   flex-shrink: 0;
+   transition: all 0.3s ease;
+   box-shadow: none !important;
+}
+
+.danger-zone-card:hover .danger-icon-wrap {
+   background: #ff416c !important;
+   color: white !important;
+   box-shadow: 0 0 20px rgba(255, 65, 108, 0.4) !important;
+}
+
+.danger-icon-wrap svg {
+   transition: transform 0.3s ease;
+}
+
+.danger-zone-card:hover .danger-icon-wrap svg {
+   transform: rotate(15deg) scale(1.1);
+}
+
+.danger-text-col {
+   flex: 1;
+}
+
+.danger-text-col .primary {
+   display: block;
+   font-weight: 800;
+   font-size: 15px;
+   color: #ff416c;
+   margin-bottom: 2px;
+}
+
+.danger-text-col .secondary {
+   display: block;
+   font-size: 11px;
+   color: var(--text-secondary);
+   line-height: 1.4;
+   opacity: 0.8;
+}
+
+.btn-nuclear {
+   background: #ff416c !important;
+   color: white !important;
+   border: none !important;
+   padding: 8px 16px !important;
+   border-radius: 8px !important;
+   font-size: 12px !important;
+   font-weight: 800 !important;
+   cursor: pointer;
+   transition: all 0.3s ease;
+   box-shadow: 0 4px 12px rgba(255, 65, 108, 0.3);
+   text-transform: uppercase;
+   letter-spacing: 0.05em;
+   white-space: nowrap;
+}
+
+.btn-nuclear:hover {
+   background: #ff1a4d !important;
+   box-shadow: 0 6px 20px rgba(255, 65, 108, 0.5);
+   transform: scale(1.05);
+}
+
+.btn-nuclear:active {
+   transform: scale(0.95);
+}
+
+.btn-nuclear:disabled {
+   opacity: 0.6;
+   cursor: not-allowed;
+   box-shadow: none;
 }

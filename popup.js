@@ -535,18 +535,21 @@ document.addEventListener("DOMContentLoaded", () => {
    if (elements.btnFactoryReset) {
       elements.btnFactoryReset.addEventListener("click", async () => {
          const confirmReset = confirm(
-            "⚠️ DANGER ZONE: This will wipe ALL settings, zaps, and focus keywords across ALL websites. You cannot undo this.\n\nAre you absolutely sure?",
+            "⚠️ DANGER ZONE: This will wipe ALL settings, zaps, categories, and keywords. You cannot undo this.\n\nAre you absolutely sure?",
          );
 
          if (confirmReset) {
+            elements.btnFactoryReset.textContent = "Wiping...";
+            elements.btnFactoryReset.disabled = true;
+
             chrome.storage.local.clear(() => {
-               alert("Factory Reset Complete! All settings have been restored to default.");
-               // Reload extension or just the page
-               location.reload();
-               // Also reload the active tab to clear injected styles
-               getActiveTab().then((tab) => {
-                  if (tab && tab.id) chrome.tabs.reload(tab.id);
-               });
+               setTimeout(() => {
+                  alert("Factory Reset Complete! All settings have been restored to default.");
+                  location.reload();
+                  getActiveTab().then((tab) => {
+                     if (tab && tab.id) chrome.tabs.reload(tab.id);
+                  });
+               }, 500); // Small delay for visual impact
             });
          }
       });
@@ -845,17 +848,27 @@ document.addEventListener("DOMContentLoaded", () => {
    // AD BLOCKER TAB FUNCTIONALITY
    // ========================================
 
-   // Load Ad Blocker Stats
+   // Load Ad Blocker Stats (Directly from storage for speed and reliability)
    async function loadAdBlockerStats() {
       try {
+         // Try to get from storage first (Truth)
+         const storageData = await chrome.storage.local.get(["universal_ad_blocker_stats"]);
+         const stats = storageData.universal_ad_blocker_stats;
+
+         if (stats && elements.statSession && elements.statTotal) {
+            elements.statSession.textContent = stats.sessionBlocked || 0;
+            elements.statTotal.textContent = stats.totalBlocked || 0;
+            return;
+         }
+
+         // Fallback to messaging if storage is empty (unlikely)
          const response = await chrome.runtime.sendMessage({ action: "GET_STATS" });
          if (response && elements.statSession && elements.statTotal) {
             elements.statSession.textContent = response.sessionBlocked || 0;
             elements.statTotal.textContent = response.totalBlocked || 0;
          }
       } catch (e) {
-         // Service worker might be inactive - show defaults
-         console.warn("[AdBlocker] Service worker not ready, using defaults");
+         // Silently handle if storage/worker is perfectly cold
          if (elements.statSession && elements.statTotal) {
             elements.statSession.textContent = "0";
             elements.statTotal.textContent = "0";
@@ -863,11 +876,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }
    }
 
-   // Load Whitelist
+   // Load Whitelist (Optimized for instant load)
    async function loadWhitelist() {
       try {
-         const response = await chrome.runtime.sendMessage({ action: "GET_WHITELIST" });
-         const whitelist = response?.whitelist || [];
+         // Storage is always faster than waking up the service worker
+         const storageData = await chrome.storage.local.get(["universal_ad_blocker_whitelist"]);
+         const whitelist = storageData.universal_ad_blocker_whitelist || [];
 
          if (elements.whitelistContainer) {
             if (whitelist.length === 0) {
@@ -892,8 +906,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         action: "REMOVE_FROM_WHITELIST",
                         hostname,
                      });
-                     await loadWhitelist();
-                     await updateToggleButton();
+                     // Refresh UI
+                     loadWhitelist();
+                     updateToggleButton();
                   });
                });
             }
@@ -903,8 +918,6 @@ document.addEventListener("DOMContentLoaded", () => {
             elements.whitelistCount.textContent = whitelist.length;
          }
       } catch (e) {
-         // Service worker might be inactive - show empty state
-         console.warn("[AdBlocker] Service worker not ready for whitelist");
          if (elements.whitelistContainer) {
             elements.whitelistContainer.innerHTML = '<div class="empty-state">No whitelisted sites</div>';
          }
@@ -914,21 +927,17 @@ document.addEventListener("DOMContentLoaded", () => {
       }
    }
 
-   // Update Toggle Button Text
+   // Update Toggle Button Text (Direct storage check to avoid worker delays)
    async function updateToggleButton() {
       try {
          const tab = await getActiveTab();
          if (!tab || !tab.url) return;
 
-         // Check if it's an internal page
          const url = new URL(tab.url);
          const isInternalPage = url.protocol === "chrome:" || url.protocol === "about:" || url.protocol === "chrome-extension:";
 
          if (isInternalPage) {
-            // Disable button for internal pages
-            if (elements.toggleSiteText) {
-               elements.toggleSiteText.textContent = "Not Available";
-            }
+            if (elements.toggleSiteText) elements.toggleSiteText.textContent = "Not Available";
             if (elements.btnToggleSite) {
                elements.btnToggleSite.disabled = true;
                elements.btnToggleSite.style.opacity = "0.5";
@@ -937,41 +946,27 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
          }
 
-         // Re-enable button for normal pages
          if (elements.btnToggleSite) {
             elements.btnToggleSite.disabled = false;
             elements.btnToggleSite.style.opacity = "1";
             elements.btnToggleSite.style.cursor = "pointer";
          }
 
-         // Try to communicate with service worker, handle if inactive
-         let response;
-         try {
-            response = await chrome.runtime.sendMessage({
-               action: "IS_WHITELISTED",
-               url: tab.url,
-            });
-         } catch (e) {
-            // Service worker is inactive - use default state
-            console.log("[AdBlocker] Service worker inactive, using default state");
-            response = { isWhitelisted: false };
-         }
+         // Check storage for whitelist
+         const storageData = await chrome.storage.local.get(["universal_ad_blocker_whitelist"]);
+         const whitelist = storageData.universal_ad_blocker_whitelist || [];
+         const isWhitelisted = whitelist.includes(url.hostname);
 
          if (elements.toggleSiteText) {
-            if (response?.isWhitelisted) {
+            if (isWhitelisted) {
                elements.toggleSiteText.textContent = "Enable on This Site";
-               if (elements.btnToggleSite) {
-                  elements.btnToggleSite.classList.add("secondary");
-               }
+               if (elements.btnToggleSite) elements.btnToggleSite.classList.add("secondary");
             } else {
                elements.toggleSiteText.textContent = "Disable on This Site";
-               if (elements.btnToggleSite) {
-                  elements.btnToggleSite.classList.remove("secondary");
-               }
+               if (elements.btnToggleSite) elements.btnToggleSite.classList.remove("secondary");
             }
          }
       } catch (e) {
-         // Silently handle errors - don't spam console
          console.log("[AdBlocker] Toggle button update skipped:", e.message);
       }
    }

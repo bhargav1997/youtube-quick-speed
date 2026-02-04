@@ -129,11 +129,16 @@ const loadWhitelist = async () => {
       const result = await chrome.storage.local.get([STORAGE_KEYS.WHITELIST]);
       if (result[STORAGE_KEYS.WHITELIST]) {
          whitelist = new Set(result[STORAGE_KEYS.WHITELIST]);
+      } else {
+         // Default whitelist - satisfying user request
+         whitelist = new Set(["youtube.com", "www.youtube.com"]);
+         await saveWhitelist();
       }
    } catch (e) {
       if (e.message !== "No SW") {
-         console.warn("[Universal Ad Blocker] Using empty whitelist:", e.message);
+         console.warn("[Universal Ad Blocker] Using initial whitelist:", e.message);
       }
+      whitelist = new Set(["youtube.com", "www.youtube.com"]);
    }
 };
 
