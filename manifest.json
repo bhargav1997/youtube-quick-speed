@@ -1,8 +1,8 @@
 {
    "manifest_version": 3,
    "name": "YouTube Quick Speed & Loop Control",
-   "version": "1.3.2",
-   "description": "Control YouTube speed (up to 16x), block ads, boost volume & loop videos. Privacy-first, no tracking. Enhance your viewing!",
+   "version": "1.3.3",
+   "description": "Control video playback, enhance audio, and access powerful browser tools — across YouTube and other websites.",
    "permissions": ["activeTab", "storage", "declarativeNetRequest", "declarativeNetRequestFeedback", "clipboardWrite"],
    "host_permissions": ["<all_urls>"],
    "action": {
@@ -40,7 +40,7 @@
    ],
    "web_accessible_resources": [
       {
-         "resources": ["icon16.png", "icon48.png", "icon128.png"],
+         "resources": ["icon16.png", "icon48.png", "icon128.png", "fonts/*"],
          "matches": ["<all_urls>"]
       }
    ]

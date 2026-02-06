@@ -1,5 +1,13 @@
 /* ... (Original CSS) ... */
 
+@font-face {
+   font-family: "Inter";
+   font-style: normal;
+   font-weight: 400 600;
+   font-display: swap;
+   src: url("fonts/Inter.woff2") format("woff2");
+}
+
 :root {
    --primary-color: #3ea6ff;
    --bg-color: #0f0f0f;
