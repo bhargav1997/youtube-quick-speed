@@ -34,13 +34,13 @@
    "content_scripts": [
       {
          "matches": ["<all_urls>"],
-         "js": ["utils/detector.js", "content.js"],
+         "js": ["utils/detector.js", "content.js", "timestamp-notes.js"],
          "run_at": "document_end"
       }
    ],
    "web_accessible_resources": [
       {
-         "resources": ["icon16.png", "icon48.png", "icon128.png", "fonts/*"],
+         "resources": ["icon16.png", "icon48.png", "icon128.png", "fonts/*", "notes-styles.css"],
          "matches": ["<all_urls>"]
       }
    ]

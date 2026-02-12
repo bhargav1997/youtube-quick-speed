@@ -79,6 +79,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Factory Reset
       btnFactoryReset: document.getElementById("btn-factory-reset"),
+
+      // Timestamp Notes
+      notesToggle: document.getElementById("notes-toggle"),
    };
 
    // Nav Items
@@ -1717,4 +1720,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
    // Load presets on startup
    loadPresets();
+
+   // ============================================================================
+   // TIMESTAMP NOTES
+   // ============================================================================
+
+   // Load notes toggle state
+   chrome.storage.local.get(["notesEnabled"], (result) => {
+      if (elements.notesToggle) {
+         elements.notesToggle.checked = result.notesEnabled || false;
+      }
+   });
+
+   // Handle notes toggle
+   if (elements.notesToggle) {
+      elements.notesToggle.addEventListener("change", async (e) => {
+         const enabled = e.target.checked;
+
+         // Save state
+         await chrome.storage.local.set({ notesEnabled: enabled });
+
+         // Send message to content script
+         await sendMessage({
+            action: "TOGGLE_NOTES_MODE",
+            enabled: enabled,
+         });
+      });
+   }
 });
