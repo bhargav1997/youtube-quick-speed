@@ -51,6 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
       btnResetStats: document.getElementById("btn-reset-stats"),
       whitelistContainer: document.getElementById("whitelist-container"),
       whitelistCount: document.getElementById("whitelist-count"),
+      adblockGlobalToggle: document.getElementById("adblock-global-toggle"),
 
       // VIDEO ENHANCER (Cinema Mode)
       filterBrightness: document.getElementById("filter-brightness"),
@@ -235,6 +236,11 @@ document.addEventListener("DOMContentLoaded", () => {
          else elements.volValue.style.color = "";
       }
 
+      // AdBlocker Global Toggle
+      if (state.adblockEnabled !== undefined && elements.adblockGlobalToggle) {
+         elements.adblockGlobalToggle.checked = state.adblockEnabled;
+      }
+
       // Filters (Cinema Mode)
       if (state.filters) {
          if (elements.filterBrightness) {
@@ -300,6 +306,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "isStrictModeEnabled",
             "volume",
             "filters", // Load filters from storage
+            "universal_ad_blocker_enabled",
          ]);
 
          // Map storage keys to UI state object
@@ -318,6 +325,7 @@ document.addEventListener("DOMContentLoaded", () => {
             strictMode: storageData.isStrictModeEnabled,
             volume: storageData.volume,
             filters: storageData.filters,
+            adblockEnabled: storageData.universal_ad_blocker_enabled,
          };
 
          // Apply local state immediately
@@ -330,7 +338,7 @@ document.addEventListener("DOMContentLoaded", () => {
                if (chrome.runtime.lastError || !response) {
                   // Content script might be dead or not loaded, but we have local settings
                   // Only show error if we really need interaction
-                  console.log("Content script not ready:", chrome.runtime.lastError);
+                  // console.log("Content script not ready:", chrome.runtime.lastError);
                } else {
                   elements.displayBadge.style = "";
                   // Merge: Local storage is truth for settings, Response is truth for runtime (speed, loop)
@@ -787,12 +795,14 @@ document.addEventListener("DOMContentLoaded", () => {
    });
 
    // Video Utility Listeners
+   /*
    if (elements.screenshotBtn) {
       elements.screenshotBtn.addEventListener("click", () => {
          sendMessage({ action: "TAKE_SNAPSHOT" });
          window.close(); // Close popup to see notification/download
       });
    }
+   */
 
    if (elements.mirrorBtn) {
       elements.mirrorBtn.addEventListener("click", async () => {
@@ -848,6 +858,19 @@ document.addEventListener("DOMContentLoaded", () => {
    // AD BLOCKER TAB FUNCTIONALITY
    // ========================================
 
+   // Handle Global Toggle
+   if (elements.adblockGlobalToggle) {
+      elements.adblockGlobalToggle.addEventListener("change", async (e) => {
+         const isEnabled = e.target.checked;
+         await chrome.runtime.sendMessage({
+            action: "TOGGLE_ENABLED",
+            enabled: isEnabled,
+         });
+         // Refresh stats/ui
+         loadAdBlockerStats();
+      });
+   }
+
    // Load Ad Blocker Stats (Directly from storage for speed and reliability)
    async function loadAdBlockerStats() {
       try {
@@ -858,6 +881,11 @@ document.addEventListener("DOMContentLoaded", () => {
          if (stats && elements.statSession && elements.statTotal) {
             elements.statSession.textContent = stats.sessionBlocked || 0;
             elements.statTotal.textContent = stats.totalBlocked || 0;
+
+            // Also update global toggle from storage if available
+            if (stats.isEnabled !== undefined && elements.adblockGlobalToggle) {
+               elements.adblockGlobalToggle.checked = stats.isEnabled;
+            }
             return;
          }
 
@@ -866,6 +894,10 @@ document.addEventListener("DOMContentLoaded", () => {
          if (response && elements.statSession && elements.statTotal) {
             elements.statSession.textContent = response.sessionBlocked || 0;
             elements.statTotal.textContent = response.totalBlocked || 0;
+
+            if (response.isEnabled !== undefined && elements.adblockGlobalToggle) {
+               elements.adblockGlobalToggle.checked = response.isEnabled;
+            }
          }
       } catch (e) {
          // Silently handle if storage/worker is perfectly cold
@@ -930,6 +962,10 @@ document.addEventListener("DOMContentLoaded", () => {
    // Update Toggle Button Text (Direct storage check to avoid worker delays)
    async function updateToggleButton() {
       try {
+         // Check global state first
+         const statsRes = await chrome.runtime.sendMessage({ action: "GET_STATS" });
+         const isGlobalEnabled = statsRes?.isEnabled;
+
          const tab = await getActiveTab();
          if (!tab || !tab.url) return;
 
@@ -938,6 +974,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
          if (isInternalPage) {
             if (elements.toggleSiteText) elements.toggleSiteText.textContent = "Not Available";
+            if (elements.btnToggleSite) {
+               elements.btnToggleSite.disabled = true;
+               elements.btnToggleSite.style.opacity = "0.5";
+               elements.btnToggleSite.style.cursor = "not-allowed";
+            }
+            return;
+         }
+
+         // If global is OFF, we can't toggle per-site (it's all off)
+         if (!isGlobalEnabled) {
+            if (elements.toggleSiteText) elements.toggleSiteText.textContent = "Global Protection is OFF";
             if (elements.btnToggleSite) {
                elements.btnToggleSite.disabled = true;
                elements.btnToggleSite.style.opacity = "0.5";
@@ -967,7 +1014,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
          }
       } catch (e) {
-         console.log("[AdBlocker] Toggle button update skipped:", e.message);
+         // Silently handle
       }
    }
 
@@ -988,7 +1035,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   url: tab.url,
                });
             } catch (e) {
-               console.log("[AdBlocker] Service worker inactive, assuming not whitelisted");
+               // Service worker inactive
                response = { isWhitelisted: false };
             }
 
@@ -1026,10 +1073,10 @@ document.addEventListener("DOMContentLoaded", () => {
                      updateToggleButton();
                   }, 2000);
                }
-               console.log("[AdBlocker] Failed to toggle whitelist:", e.message);
+               // Silently handle
             }
          } catch (e) {
-            console.log("[AdBlocker] Toggle whitelist error:", e.message);
+            // Silently handle
          }
       });
    }
@@ -1072,9 +1119,9 @@ document.addEventListener("DOMContentLoaded", () => {
    });
 
    // ========================================
-   // SCREENSHOT FUNCTIONALITY
+   // SCREENSHOT FUNCTIONALITY - TEMPORARILY DISABLED
    // ========================================
-
+   /*
    let currentScreenshotMode = "visible";
    let capturedImageData = null;
 
@@ -1120,7 +1167,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   {
                      action: "CAPTURE_SCREENSHOT",
                      mode: currentScreenshotMode,
-                  },
+                   },
                   (response) => {
                      if (chrome.runtime.lastError) {
                         resolve(null);
@@ -1153,7 +1200,7 @@ document.addEventListener("DOMContentLoaded", () => {
                      chrome.tabs.reload(tab.id);
                      setTimeout(() => {
                         btn.innerHTML = originalHTML;
-                        btn.style.cursor = "";
+                         btn.style.cursor = "";
                         btn.onclick = null;
                      }, 1000);
                   };
@@ -1301,6 +1348,7 @@ document.addEventListener("DOMContentLoaded", () => {
          }
       });
    }
+   */
 
    // ============================================================================
    // THUMBNAIL DOWNLOADER - TEMPORARILY DISABLED FOR CHROME WEB STORE COMPLIANCE

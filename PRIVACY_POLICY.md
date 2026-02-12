@@ -8,15 +8,15 @@ YouTube Quick Speed ("we" or "the extension") is a browser extension dedicated t
 **2. Data Collection**
 We utilize a strict "Zero Data Collection" policy:
 
--  **No Personal Data:** We do not collect names, email addresses, or any personally identifiable information.
--  **No Browsing History:** We do not track, store, or transmit your browsing history or the videos you watch.
--  **No Usage Analytics:** We do not use third-party analytics tools (like Google Analytics) to track how you use the extension.
+- **No Personal Data:** We do not collect names, email addresses, or any personally identifiable information.
+- **No Browsing History:** We do not track, store, or transmit your browsing history or the videos you watch.
+- **No Usage Analytics:** We do not use third-party analytics tools (like Google Analytics) to track how you use the extension.
 
 **3. Permissions & Data Access**
 The extension requests specific permissions to function:
 
--  **"activeTab" & "scripting":** Used solely to interact with the YouTube video player (HTML5 Video Element) on the tab you are currently viewing. This allows us to change playback speed, volume, and button states locally in your browser.
--  **"Host Permission (_://_.youtube.com/\*)":** Required to detect when you navigate between videos so that your speed settings can be preserved.
+- **"activeTab" & "scripting":** Used solely to interact with the YouTube video player (HTML5 Video Element) on the tab you are currently viewing. This allows us to change playback speed, volume, and button states locally in your browser.
+- **"Host Permission (_://_.youtube.com/\*)":** Required to detect when you navigate between videos so that your speed settings can be preserved.
 
 **4. Data Storage**
 All preferences (such as your last used speed or loop settings) are stored locally on your device using Chrome's `storage.local` API. This data never leaves your browser.

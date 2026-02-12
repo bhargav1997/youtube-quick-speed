@@ -36,9 +36,9 @@ const safeSendMessage = (message) => {
 let state = {
    targetSpeed: 1.0,
    isAutoSkipEnabled: false,
-   isSpeedAdEnabled: true,
+   isSpeedAdEnabled: false,
    isZenModeEnabled: false,
-   isBoosterEnabled: true,
+   isBoosterEnabled: false,
    isAutoScrollShortsEnabled: false,
    volume: 1.0,
    loop: { active: false, start: null, end: null },
@@ -51,6 +51,7 @@ let state = {
    customCategories: [],
    isMirrored: false,
    isZapperActive: false,
+   isUniversalEnabled: false,
 };
 
 let zapperListeners = null;
@@ -69,9 +70,11 @@ const injectZapperStyles = () => {
          transition: outline 0.1s ease !important;
       }
    `;
-   document.head.appendChild(style);
+   // document.head.appendChild(style); // Moved to lazy injection
 };
-injectZapperStyles();
+
+// DO NOT auto-inject styles at top level
+// injectZapperStyles();
 
 const getSelector = (el) => {
    if (el.id) return `#${CSS.escape(el.id)}`;
@@ -121,6 +124,7 @@ const applyZaps = async () => {
 const toggleZapper = (active) => {
    state.isZapperActive = active;
    if (active) {
+      injectZapperStyles(); // Lazy injection
       const onMouseOver = (e) => {
          e.stopPropagation();
          e.target.classList.add("yqs-zapper-highlight");
@@ -147,18 +151,20 @@ const toggleZapper = (active) => {
       const onKeyDown = (e) => {
          if (e.key === "Escape") toggleZapper(false);
       };
-      document.addEventListener("mouseover", onMouseOver, true);
-      document.addEventListener("mouseout", onMouseOut, true);
-      document.addEventListener("click", onClick, true);
-      document.addEventListener("keydown", onKeyDown, true);
       zapperListeners = { onMouseOver, onMouseOut, onClick, onKeyDown };
+
+      document.addEventListener("mouseover", onMouseOver, { capture: true, passive: true });
+      document.addEventListener("mouseout", onMouseOut, { capture: true, passive: true });
+      document.addEventListener("click", onClick, { capture: true });
+      document.addEventListener("keydown", onKeyDown, { capture: true, passive: true });
       document.body.style.cursor = "crosshair";
    } else {
       if (zapperListeners) {
-         document.removeEventListener("mouseover", zapperListeners.onMouseOver, true);
-         document.removeEventListener("mouseout", zapperListeners.onMouseOut, true);
-         document.removeEventListener("click", zapperListeners.onClick, true);
-         document.removeEventListener("keydown", zapperListeners.onKeyDown, true);
+         const { onMouseOver, onMouseOut, onClick, onKeyDown } = zapperListeners;
+         document.removeEventListener("mouseover", onMouseOver, { capture: true });
+         document.removeEventListener("mouseout", onMouseOut, { capture: true });
+         document.removeEventListener("click", onClick, { capture: true });
+         document.removeEventListener("keydown", onKeyDown, { capture: true });
          zapperListeners = null;
       }
       document.querySelectorAll(".yqs-zapper-highlight").forEach((el) => el.classList.remove("yqs-zapper-highlight"));
@@ -353,10 +359,9 @@ const checkWhitelist = async () => {
 // Block popups and redirects
 const blockPopupsAndRedirects = () => {
    // Block window.open (popups)
-   const originalOpen = window.open;
-   window.open = function (...args) {
-      return null;
-   };
+   // window.open = function (...args) {
+   //    return null;
+   // };
 
    // Block pop-unders (new window opening)
    window.addEventListener(
@@ -384,17 +389,17 @@ const blockPopupsAndRedirects = () => {
       true,
    );
 
-   // Block beforeunload popups
-   window.addEventListener(
-      "beforeunload",
-      (e) => {
-         delete e.returnValue;
-      },
-      true,
-   );
+   // Block beforeunload popups - REMOVED to avoid Permissions Policy violation on modern YouTube
+   // window.addEventListener(
+   //    "beforeunload",
+   //    (e) => {
+   //       delete e.returnValue;
+   //    },
+   //    true,
+   // );
 };
 
-// Initialize Universal Ad Blocking
+// Initialize Universal Ad Blocking context
 const currentSite = detectCurrentSite();
 
 // Skip ad blocking on chrome:// and about: pages (New Tab, Settings, etc.)
@@ -415,17 +420,31 @@ const isGoogleApp =
    currentSite.hostname.includes("photos.google.com") ||
    currentSite.hostname.includes("linkedin.com"); // Protect LinkedIn job applications and professional features
 
-if (currentSite.type !== "youtube" && !isInternalPage && !isGoogleApp) {
-   // Activate popup & redirect blocking immediately
-   blockPopupsAndRedirects();
+// Initialize Universal Ad Blocking in a safe async context
+(async () => {
+   if (isInternalPage || isGoogleApp) return;
+
+   // Check global status (universal_ad_blocker_enabled)
+   const result = await chrome.storage.local.get(["universal_ad_blocker_enabled", "universal_ad_blocker_whitelist"]);
+   state.isUniversalEnabled = result.universal_ad_blocker_enabled || false;
+
+   // If extension is globally OFF, and it's NOT youtube, we can stop entirely
+   // If it IS youtube, we continue for our player controls, but skip ad-blocking parts later
+   if (!state.isUniversalEnabled && currentSite.type !== "youtube") {
+      return;
+   }
+
+   // Activate popup & redirect blocking ONLY for non-YouTube sites if enabled
+   if (state.isUniversalEnabled && currentSite.type !== "youtube") {
+      blockPopupsAndRedirects();
+   }
 
    // Check whitelist first
-   checkWhitelist().then((isWhitelisted) => {
-      if (isWhitelisted) {
-         return;
-      }
+   const isWhitelisted = await checkWhitelist();
+   if (isWhitelisted) return;
 
-      // For non-YouTube sites, run universal ad blocking
+   // For non-YouTube sites, run universal ad blocking only if enabled
+   if (state.isUniversalEnabled && currentSite.type !== "youtube") {
       const initialHidden = hideUniversalAds(true); // TRUE = remove completely
       if (initialHidden > 0) {
          safeSendMessage({
@@ -437,13 +456,9 @@ if (currentSite.type !== "youtube" && !isInternalPage && !isGoogleApp) {
 
       // Watch for new ads with MutationObserver
       const observer = new MutationObserver(() => {
-         const newHidden = hideUniversalAds(true); // TRUE = remove completely
+         const newHidden = hideUniversalAds(true);
          if (newHidden > 0) {
-            safeSendMessage({
-               action: "INCREMENT_STATS",
-               domain: currentSite.hostname,
-               type: "element",
-            });
+            safeSendMessage({ action: "INCREMENT_STATS", domain: currentSite.hostname, type: "element" });
          }
       });
 
@@ -455,19 +470,16 @@ if (currentSite.type !== "youtube" && !isInternalPage && !isGoogleApp) {
          });
       }
 
-      // CONTINUOUS SCANNING - Run every 2 seconds to catch delayed ads
+      // CONTINUOUS SCANNING
       setInterval(() => {
+         if (!state.isUniversalEnabled) return;
          const scannedHidden = hideUniversalAds(true);
          if (scannedHidden > 0) {
-            safeSendMessage({
-               action: "INCREMENT_STATS",
-               domain: currentSite.hostname,
-               type: "element",
-            });
+            safeSendMessage({ action: "INCREMENT_STATS", domain: currentSite.hostname, type: "element" });
          }
-      }, 2000); // Scan every 2 seconds
-   });
-}
+      }, 5000);
+   }
+})();
 
 // ============================================================================
 // YOUTUBE-SPECIFIC CODE (Existing functionality preserved)
@@ -509,14 +521,30 @@ if (currentSite.type === "youtube") {
       // Only enforce if not in special modes
       if (!state.isAdSpeeding && !state.isKeyBoosting) {
          if (Math.abs(video.playbackRate - targetSpeed) > 0.01) {
-            video.playbackRate = targetSpeed;
-            lastEnforcedSpeed = targetSpeed;
+            if (targetSpeed !== 1.0) {
+               video.playbackRate = targetSpeed;
+               lastEnforcedSpeed = targetSpeed;
+            }
          }
       }
    };
 
-   // Run speed enforcement every 100ms (very aggressive)
-   setInterval(enforceShortsSpeed, 100);
+   // loadSettings(); // Removed duplicate call, handled at bottom
+
+   // Periodic check for shorts speed enforcement
+   setInterval(() => {
+      const targetSpeed = state.targetSpeed || 1.0;
+      if (targetSpeed !== 1.0) {
+         enforceShortsSpeed();
+      }
+   }, 1000); // 1s check for target speed change is enough to decide whether to enforce at 100ms
+
+   // The 100ms listener is now internal to enforceShortsSpeed trigger logic
+   // or we just use a single interval that checks frequency.
+   // Let's just keep it simple:
+   setInterval(() => {
+      if (state.targetSpeed !== 1.0) enforceShortsSpeed();
+   }, 100);
 
    // ============================================================================
    // SUPERIOR AUTO-SCROLL IMPLEMENTATION (Class-based, Event-driven)
@@ -549,7 +577,7 @@ if (currentSite.type === "youtube") {
          if (!video) return;
 
          if (video !== this.currentVideo) {
-            console.log("[Auto-Scroll] 🔄 Video element replaced, re-binding...");
+            // console.log("[Auto-Scroll] 🔄 Video element replaced, re-binding...");
             this.currentVideo = video;
             this.setupVideoListener(video);
          }
@@ -593,7 +621,7 @@ if (currentSite.type === "youtube") {
 
          this.videoEndListener = () => {
             if (this.canScroll()) {
-               console.log("[Auto-Scroll] ✅ Ended event -> Scrolling");
+               // console.log("[Auto-Scroll] ✅ Ended event -> Scrolling");
                this.scrollToNextShort();
             }
          };
@@ -606,7 +634,7 @@ if (currentSite.type === "youtube") {
 
          video.addEventListener("ended", this.videoEndListener);
          video.addEventListener("timeupdate", this.timeUpdateListener);
-         console.log("[Auto-Scroll] Listeners active for", video.src);
+         // console.log("[Auto-Scroll] Listeners active for", video.src);
       }
 
       _setupVideoListener_unused(video) {
@@ -624,7 +652,7 @@ if (currentSite.type === "youtube") {
          // Unified scroll triggers
          this.videoEndListener = () => {
             if (this.canScroll()) {
-               console.log("[Auto-Scroll] ✅ Ended event -> Scrolling");
+               // console.log("[Auto-Scroll] ✅ Ended event (legacy) -> Scrolling");
                this.scrollToNextShort();
             }
          };
@@ -640,7 +668,7 @@ if (currentSite.type === "youtube") {
             if (this.state.isAutoScrollShortsEnabled && this.isAd()) {
                if (!this.adSkipTriggered) {
                   this.adSkipTriggered = true;
-                  console.log("[Auto-Scroll] 🚫 Ad detected, scrolling...");
+                  // console.log("[Auto-Scroll] 🚫 Ad detected, scrolling...");
                   this.scrollToNextShort(true); // Force skip
                }
                return;
@@ -656,7 +684,7 @@ if (currentSite.type === "youtube") {
             // We ignore small seeks/scrubs (e.g. going back 1 second) by checking if we were relatively far in the video.
             if (this.lastVideoTime > 5.0 && currentTime < 1.0) {
                if (!this.hasTriggered && this.state.isAutoScrollShortsEnabled) {
-                  console.log("[Auto-Scroll] 🔄 Loop detected (generic time reversal), scrolling...");
+                  // console.log("[Auto-Scroll] 🔄 Loop detected (generic time reversal), scrolling...");
                   this.hasTriggered = true;
                   this.scrollToNextShort();
                }
@@ -668,7 +696,7 @@ if (currentSite.type === "youtube") {
 
             if (isNearEnd && isNearStart) {
                if (!this.hasTriggered && this.state.isAutoScrollShortsEnabled) {
-                  console.log("[Auto-Scroll] 🔄 Loop detected (percentage jump), scrolling...");
+                  // console.log("[Auto-Scroll] 🔄 Loop detected (percentage jump), scrolling...");
                   this.hasTriggered = true;
                   this.scrollToNextShort();
                }
@@ -680,7 +708,7 @@ if (currentSite.type === "youtube") {
                const timeRemaining = duration - currentTime;
                // Relaxed to 0.25s and removed !video.paused check as sometimes it reports paused right before end
                if (timeRemaining > 0 && timeRemaining < 0.25) {
-                  console.log("[Auto-Scroll] ⏱️ Near end detected, scrolling...");
+                  // console.log("[Auto-Scroll] ⏱️ Near end detected, scrolling...");
                   this.hasTriggered = true;
                   this.scrollToNextShort();
                }
@@ -690,13 +718,13 @@ if (currentSite.type === "youtube") {
          };
 
          video.addEventListener("timeupdate", this.timeUpdateListener);
-         console.log("[Auto-Scroll] Listeners attached to video", video.src);
+         // console.log("[Auto-Scroll] Listeners attached to video", video.src);
       }
 
       onVideoEnd() {
          // Deprecated in favor of inline listener above, but kept if needed for legacy calls.
          if (this.canScroll()) {
-            console.log("[Auto-Scroll] ✅ Ended event (legacy) -> Scrolling");
+            // console.log("[Auto-Scroll] ✅ Ended event (legacy) -> Scrolling");
             this.scrollToNextShort();
          }
       }
@@ -711,7 +739,7 @@ if (currentSite.type === "youtube") {
          if (this.isAd()) {
             if (this.canScroll(true)) {
                // force=true for ads
-               console.log("[Auto-Scroll] 🚫 Ad detected -> Skipping");
+               // console.log("[Auto-Scroll] 🚫 Ad detected -> Skipping");
                this.scrollToNextShort(true);
             }
             return;
@@ -724,14 +752,14 @@ if (currentSite.type === "youtube") {
          // Generic time reversal (catch-all for loops)
          if (this.lastVideoTime > 5.0 && currentTime < 1.0) {
             if (this.canScroll()) {
-               console.log("[Auto-Scroll] 🔄 Loop (Time Jump) -> Scrolling");
+               // console.log("[Auto-Scroll] 🔄 Loop (Time Jump) -> Scrolling");
                this.scrollToNextShort();
             }
          }
          // Percentage based loop (short videos)
          else if (this.lastVideoTime > duration * 0.85 && currentTime < duration * 0.15) {
             if (this.canScroll()) {
-               console.log("[Auto-Scroll] 🔄 Loop (%) -> Scrolling");
+               // console.log("[Auto-Scroll] 🔄 Loop (%) -> Scrolling");
                this.scrollToNextShort();
             }
          }
@@ -740,7 +768,7 @@ if (currentSite.type === "youtube") {
             const timeRemaining = duration - currentTime;
             if (timeRemaining > 0 && timeRemaining < 0.25) {
                if (this.canScroll()) {
-                  console.log("[Auto-Scroll] ⏱️ Near End -> Scrolling");
+                  // console.log("[Auto-Scroll] ⏱️ Near End -> Scrolling");
                   this.scrollToNextShort();
                }
             }
@@ -819,7 +847,7 @@ if (currentSite.type === "youtube") {
 
       scrollToNextShort(force = false) {
          // 1. Keyboard Navigation (Most Reliable)
-         console.log("[Auto-Scroll] ⌨️ Sending ArrowDown");
+         // console.log("[Auto-Scroll] ⌨️ Sending ArrowDown");
          const downEvent = new KeyboardEvent("keydown", {
             key: "ArrowDown",
             code: "ArrowDown",
@@ -1166,10 +1194,12 @@ if (currentSite.type === "youtube") {
             sendResponse({ customCategories: state.customCategories });
             break;
 
+         /*
          case "TAKE_SNAPSHOT":
             takeSnapshot();
             sendResponse({ success: true });
             break;
+         */
 
          case "TOGGLE_MIRROR":
             toggleMirror(request.enabled);
@@ -1203,12 +1233,13 @@ if (currentSite.type === "youtube") {
          filters: state.filters, // Save filters
       };
       chrome.storage.local.set({ [STORAGE_KEY]: settings }, () => {
-         console.log("[Settings] Saved - Auto-scroll:", state.isAutoScrollShortsEnabled);
+         // Silenced for production
       });
    };
 
    const loadSettings = () => {
-      chrome.storage.local.get([STORAGE_KEY], (result) => {
+      chrome.storage.local.get([STORAGE_KEY, "universal_ad_blocker_enabled"], (result) => {
+         state.isUniversalEnabled = result.universal_ad_blocker_enabled || false;
          if (result[STORAGE_KEY]) {
             const saved = result[STORAGE_KEY];
             if (saved.targetSpeed) state.targetSpeed = saved.targetSpeed;
@@ -1217,7 +1248,6 @@ if (currentSite.type === "youtube") {
             if (saved.isBoosterEnabled !== undefined) state.isBoosterEnabled = saved.isBoosterEnabled;
             if (saved.isAutoScrollShortsEnabled !== undefined) {
                state.isAutoScrollShortsEnabled = saved.isAutoScrollShortsEnabled;
-               console.log("[Settings] Loaded - Auto-scroll:", state.isAutoScrollShortsEnabled);
             }
 
             // Load Focus
@@ -1428,7 +1458,7 @@ if (currentSite.type === "youtube") {
             }
          }
       },
-      true,
+      { capture: true, passive: true },
    );
 
    document.addEventListener(
@@ -1450,7 +1480,7 @@ if (currentSite.type === "youtube") {
             enforceSpeed();
          }
       },
-      true,
+      { capture: true, passive: true },
    );
 
    window.addEventListener("blur", () => {
@@ -1501,7 +1531,8 @@ if (currentSite.type === "youtube") {
 
          // Start Ad Ad Loop - NO FORCE PLAY, NO COMPLEX CLICKS
          if (!adInterval) {
-            skipAd();
+            // CRITICAL FIX: Only skip if explicitly enabled
+            if (state.isAutoSkipEnabled) skipAd();
 
             let lastSrc = "";
             const video = getVideo();
@@ -1625,7 +1656,10 @@ if (currentSite.type === "youtube") {
       // Normal Speed
       if (!Number.isNaN(state.targetSpeed) && state.targetSpeed > 0) {
          if (Math.abs(video.playbackRate - state.targetSpeed) > 0.01) {
-            video.playbackRate = state.targetSpeed;
+            // Only force speed if target is not 1.0 (default)
+            if (state.targetSpeed !== 1.0) {
+               video.playbackRate = state.targetSpeed;
+            }
          }
       }
    };
@@ -1664,6 +1698,9 @@ if (currentSite.type === "youtube") {
    let popupCooldown = false;
 
    const handlePopups = () => {
+      // ONLY run if ad-handling features are enabled
+      if (!state.isAutoSkipEnabled && !state.isSpeedAdEnabled) return;
+
       if (popupCooldown) return;
 
       // 1. SPECIFIC CHECK: YouTube "Ad blockers are not allowed" dialog (Repeated handling allowed with cooldown)
@@ -1676,17 +1713,17 @@ if (currentSite.type === "youtube") {
          if (enforcement.tagName === "TP-YT-PAPER-DIALOG" && !enforcement.innerText.includes("Ad blockers")) {
             // Not the droid we are looking for (probably playlist/share dialog)
          } else {
-            console.log("[Auto-Skip] 🚫 Enforcement popup detected");
+            // console.log("[Auto-Skip] 🚫 Enforcement popup detected");
             const closeBtn =
                enforcement.querySelector("#dismiss-button button") ||
                enforcement.querySelector('button[aria-label="Close"]') ||
                enforcement.querySelector(".yt-spec-button-shape-next--filled"); // generic primary button fallback
 
             if (closeBtn) {
-               console.log("[Auto-Skip] 👆 Clicking dismiss button");
+               // console.log("[Auto-Skip] 👆 Clicking dismiss button");
                triggerClick(closeBtn);
             } else {
-               console.log("[Auto-Skip] 🗑️ Removing enforcement popup from DOM");
+               // console.log("[Auto-Skip] 🗑️ Removing enforcement popup from DOM");
                enforcement.remove(); // Aggressive removal
 
                // Also remove the backdrop (grey overlay)
@@ -1697,7 +1734,7 @@ if (currentSite.type === "youtube") {
             // Force resume video (often paused by the popup)
             const video = getVideo();
             if (video && video.paused) {
-               console.log("[Auto-Skip] ▶️ Resuming video");
+               // console.log("[Auto-Skip] ▶️ Resuming video");
                video.play();
             }
 
@@ -1721,7 +1758,7 @@ if (currentSite.type === "youtube") {
                dialog.innerText &&
                (dialog.innerText.includes("Ad blockers are not allowed") || dialog.innerText.includes("Video playback is blocked"))
             ) {
-               console.log("[Auto-Skip] 🚨 Generic popup detection triggered");
+               // console.log("[Auto-Skip] 🚨 Generic popup detection triggered");
                dialog.remove();
                const backdrop = document.querySelector("tp-yt-iron-overlay-backdrop");
                if (backdrop) backdrop.remove();
@@ -1999,40 +2036,67 @@ if (currentSite.type === "youtube") {
    // ---------------------------------------------------------
    // OPTIMIZED OBSERVERS & PASSIVE LISTENERS
    // ---------------------------------------------------------
+   // Observer Storage to prevent duplicates
+   let activeObservers = {
+      popup: null,
+      player: null,
+      content: null,
+   };
+
    const initObservers = () => {
+      // Disconnect existing observers if any
+      if (activeObservers.popup) activeObservers.popup.disconnect();
+      if (activeObservers.player) activeObservers.player.disconnect();
+      if (activeObservers.content) activeObservers.content.disconnect();
+
       // 1. Popup Observer (Targeted: ytd-popup-container)
-      const popupContainer = document.querySelector("ytd-popup-container");
-      if (popupContainer) {
-         const popupObserver = new MutationObserver(() => {
-            handlePopups();
-         });
-         popupObserver.observe(popupContainer, { childList: true, subtree: true });
-      } else {
-         // Fallback: Check body but polling will cover us mostly
-         // Retry finding container, as it might load late
-         setTimeout(initObservers, 2000);
+      if (state.isAutoSkipEnabled || state.isSpeedAdEnabled) {
+         const popupContainer = document.querySelector("ytd-popup-container");
+         if (popupContainer) {
+            activeObservers.popup = new MutationObserver(() => {
+               handlePopupsThrottled();
+            });
+            activeObservers.popup.observe(popupContainer, { childList: true, subtree: true });
+         }
       }
 
       // 2. Player Observer (Specific, Attributes only)
       const player = document.querySelector(".html5-video-player");
       if (player) {
-         const playerObserver = new MutationObserver(() => {
+         activeObservers.player = new MutationObserver(() => {
             updateAdState();
          });
-         playerObserver.observe(player, { attributes: true, attributeFilter: ["class"] });
+         activeObservers.player.observe(player, { attributes: true, attributeFilter: ["class"] });
       }
 
-      // 3. Grid/Feed Observer for Focus Filter
-      // Observe the main content container to detect new video loads (infinite scroll)
-      // ytd-app combines almost everything. 'content' is usually the main wrapper.
+      // 3. Global Observer (detects late-loading containers and focus filter triggers)
       const contentApp = document.querySelector("ytd-app") || document.body;
-      const contentObserver = new MutationObserver((mutations) => {
-         // Throttle slightly
-         if (state.isFocusModeEnabled) {
-            runFocusFilter();
+      let focusThrottleTimeout = null;
+      activeObservers.content = new MutationObserver((mutations) => {
+         // If we finally found the popup container, re-init targeted observers
+         if (!activeObservers.popup && document.querySelector("ytd-popup-container")) {
+            initObservers();
          }
+
+         // Throttle focus filter
+         if (focusThrottleTimeout) return;
+         focusThrottleTimeout = setTimeout(() => {
+            if (state.isFocusModeEnabled) {
+               runFocusFilter();
+            }
+            focusThrottleTimeout = null;
+         }, 1000); // 1000ms is enough for background filtering
       });
-      contentObserver.observe(contentApp, { childList: true, subtree: true });
+      activeObservers.content.observe(contentApp, { childList: true });
+   };
+
+   let popupThrottle = null;
+   const handlePopupsThrottled = () => {
+      if (popupThrottle) return;
+      popupThrottle = setTimeout(() => {
+         handlePopups();
+         popupThrottle = null;
+      }, 500);
    };
 
    // Start Observers
@@ -2040,11 +2104,11 @@ if (currentSite.type === "youtube") {
 
    setInterval(() => {
       const video = getVideo();
-      handlePopups();
-      if (state.isFocusModeEnabled) runFocusFilter();
+      // handlePopups moved to observers and slower failsafe
+      // if (state.isFocusModeEnabled) runFocusFilter(); // Moved to observers
 
       // Failsafe: Always try to skip if enabled, even if detection missed it
-      if (state.isAutoSkipEnabled) skipAd();
+      if (state.isAutoSkipEnabled && detectAdState()) skipAd();
 
       if (video) {
          updateAdState();
@@ -2081,9 +2145,11 @@ if (currentSite.type === "youtube") {
                const expectedSpeed = state.targetSpeed || 1.0;
                if (Math.abs(video.playbackRate - expectedSpeed) > 0.01) {
                   // YouTube changed the speed, enforce ours
-                  setTimeout(() => {
-                     video.playbackRate = expectedSpeed;
-                  }, 10);
+                  if (expectedSpeed !== 1.0) {
+                     setTimeout(() => {
+                        video.playbackRate = expectedSpeed;
+                     }, 10);
+                  }
                }
             }
          });
@@ -2100,24 +2166,27 @@ if (currentSite.type === "youtube") {
       setTimeout(() => {
          attachSpeedListener();
          enforceSpeed();
-         initObservers(); // Re-bind if player DOM replaced
+         // initObservers(); // Observers handle persistence better now
       }, 500);
    });
 
    // Monitor for video element changes (important for Shorts)
+   // Low-frequency observer for video attaches
    const videoObserver = new MutationObserver(() => {
       attachSpeedListener();
    });
 
    videoObserver.observe(document.body, {
       childList: true,
-      subtree: true,
+      subtree: false, // subtree: false on body is enough to catch app state changes
    });
 
    loadSettings();
 
-   // Initialize auto-scroll manager with state reference
-   autoScrollManager = new YouTubeShortsAutoScroll(state);
+   // Initialize auto-scroll manager only if enabled
+   if (state.isAutoScrollShortsEnabled) {
+      autoScrollManager = new YouTubeShortsAutoScroll(state);
+   }
 
    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const video = getVideo();
@@ -2342,10 +2411,12 @@ if (currentSite.type === "youtube") {
             sendResponse({ success: true, isMirrored: state.isMirrored });
             break;
 
+         /*
          case "TAKE_SNAPSHOT":
             takeSnapshot();
             sendResponse({ success: true });
             break;
+         */
 
          case "GET_STATE":
             let currentSpeed = state.targetSpeed;
@@ -2403,11 +2474,13 @@ if (currentSite.type === "youtube") {
 // ============================================================================
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+   /*
    // Verify screenshot utility only for screenshot actions
    if (request.action && request.action.includes("SCREENSHOT") && !window.ScreenshotUtil) {
       sendResponse({ success: false, error: "Screenshot utility not loaded" });
       return false;
    }
+   */
 
    switch (request.action) {
       case "TOGGLE_ZAPPER":
@@ -2425,6 +2498,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
          });
          return true;
 
+      /*
       case "CAPTURE_SCREENSHOT":
          (async () => {
             try {
@@ -2475,6 +2549,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ success: false, error: error.message });
          }
          break;
+      */
 
       default:
          // Not a screenshot action, ignore

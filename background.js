@@ -15,7 +15,7 @@ const DEFAULT_SETTINGS = {
    blockingLevel: "balanced", // 'conservative', 'balanced', 'aggressive'
    blockAnalytics: false,
    blockSocialTrackers: true,
-   enabled: true,
+   enabled: false,
 };
 
 // ============================================================================
@@ -32,7 +32,7 @@ let stats = {
 
 let whitelist = new Set();
 let settings = { ...DEFAULT_SETTINGS };
-let isEnabled = true;
+let isEnabled = false;
 
 // ============================================================================
 // INITIALIZATION
@@ -43,6 +43,7 @@ const initialize = async () => {
    await loadSettings();
    await loadStats();
    await loadWhitelist();
+   await updateBlockingRules();
 
    // Set up listeners
    setupMessageListeners();
@@ -56,7 +57,7 @@ const initialize = async () => {
       await chrome.declarativeNetRequest.updateDynamicRules({
          removeRuleIds: dynamicIds,
       });
-      console.log("[Universal Ad Blocker] Cleared all dynamic rules.");
+      // console.log("[Universal Ad Blocker] Cleared all dynamic rules.");
    }
 
    // Update badge
@@ -80,10 +81,10 @@ const loadSettings = async () => {
       // Silently use defaults if storage fails (common on first load)
       // "No SW" error is expected when service worker is initializing
       if (e.message !== "No SW") {
-         console.warn("[Universal Ad Blocker] Using default settings:", e.message);
+         // Silently handle
       }
       settings = { ...DEFAULT_SETTINGS };
-      isEnabled = true;
+      isEnabled = false;
    }
 };
 
@@ -96,7 +97,7 @@ const saveSettings = async () => {
    } catch (e) {
       // Suppress "No SW" errors - they're expected during initialization
       if (e.message !== "No SW") {
-         console.error("[Universal Ad Blocker] Failed to save settings:", e);
+         // Silently handle
       }
    }
 };
@@ -109,7 +110,7 @@ const loadStats = async () => {
       }
    } catch (e) {
       if (e.message !== "No SW") {
-         console.warn("[Universal Ad Blocker] Using default stats:", e.message);
+         // Silently handle
       }
    }
 };
@@ -119,7 +120,7 @@ const saveStats = async () => {
       await chrome.storage.local.set({ [STORAGE_KEYS.STATS]: stats });
    } catch (e) {
       if (e.message !== "No SW") {
-         console.error("[Universal Ad Blocker] Failed to save stats:", e);
+         // Silently handle
       }
    }
 };
@@ -136,7 +137,7 @@ const loadWhitelist = async () => {
       }
    } catch (e) {
       if (e.message !== "No SW") {
-         console.warn("[Universal Ad Blocker] Using initial whitelist:", e.message);
+         // Silently handle
       }
       whitelist = new Set(["youtube.com", "www.youtube.com"]);
    }
@@ -147,7 +148,7 @@ const saveWhitelist = async () => {
       await chrome.storage.local.set({ [STORAGE_KEYS.WHITELIST]: Array.from(whitelist) });
    } catch (e) {
       if (e.message !== "No SW") {
-         console.error("[Universal Ad Blocker] Failed to save whitelist:", e);
+         // Silently handle
       }
    }
 };
@@ -205,7 +206,30 @@ const updateBadge = async () => {
       // Just clear the badge completely
       await chrome.action.setBadgeText({ text: "" });
    } catch (e) {
-      console.error("[Universal Ad Blocker] Failed to update badge:", e);
+      // Silently handle
+   }
+};
+
+// ============================================================================
+// RULESET MANAGEMENT
+// ============================================================================
+
+const updateBlockingRules = async () => {
+   if (!chrome.declarativeNetRequest) return;
+
+   try {
+      const rulesetId = "ad_blocking_rules";
+      if (isEnabled) {
+         await chrome.declarativeNetRequest.updateEnabledRulesets({
+            enableRulesetIds: [rulesetId],
+         });
+      } else {
+         await chrome.declarativeNetRequest.updateEnabledRulesets({
+            disableRulesetIds: [rulesetId],
+         });
+      }
+   } catch (e) {
+      // Silently handle
    }
 };
 
@@ -249,7 +273,7 @@ const setupRequestListeners = () => {
 
             incrementStats(domain, type);
          } catch (e) {
-            console.error("[Universal Ad Blocker] Error processing blocked request:", e);
+            // Silently handle
          }
       });
    }
@@ -268,7 +292,7 @@ const setupMessageListeners = () => {
             sendResponse(response);
          })
          .catch((error) => {
-            console.error("[Universal Ad Blocker] Message handler error:", error);
+            // Silently handle
             sendResponse({ success: false, error: error.message });
          });
 
@@ -309,6 +333,7 @@ const handleMessage = async (request, sender) => {
       case "TOGGLE_ENABLED":
          isEnabled = request.enabled !== undefined ? request.enabled : !isEnabled;
          await saveSettings();
+         await updateBlockingRules();
          updateBadge();
          return { success: true, isEnabled };
 

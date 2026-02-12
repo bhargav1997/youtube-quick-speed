@@ -1,7 +1,7 @@
 {
    "manifest_version": 3,
    "name": "YouTube Quick Speed & Loop Control",
-   "version": "1.3.3",
+   "version": "1.3.4",
    "description": "Control video playback, enhance audio, and access powerful browser tools — across YouTube and other websites.",
    "permissions": ["activeTab", "storage", "declarativeNetRequest", "declarativeNetRequestFeedback", "clipboardWrite"],
    "host_permissions": ["<all_urls>"],
@@ -26,7 +26,7 @@
       "rule_resources": [
          {
             "id": "ad_blocking_rules",
-            "enabled": true,
+            "enabled": false,
             "path": "rules/ad-blocking-rules.json"
          }
       ]
@@ -34,7 +34,7 @@
    "content_scripts": [
       {
          "matches": ["<all_urls>"],
-         "js": ["utils/detector.js", "utils/screenshot.js", "content.js"],
+         "js": ["utils/detector.js", "content.js"],
          "run_at": "document_end"
       }
    ],

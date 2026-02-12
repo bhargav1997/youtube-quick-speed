@@ -16,70 +16,70 @@
 
 ## 🚀 Core Features
 
-* **🏎 Precise Speed Control**
+- **🏎 Precise Speed Control**
   Set playback speed up to **4×** (beyond YouTube’s default 2×).
 
-* **⏩ Auto-Skip Ads**
+- **⏩ Auto-Skip Ads**
   Automatically clicks the “Skip Ad” button when available.
 
-* **⚡ Speed Up Ads**
+- **⚡ Speed Up Ads**
   Detects ads and temporarily speeds them up to **16×** while muting audio.
 
-* **📢 Volume Booster**
+- **📢 Volume Booster**
   Boost audio volume up to **600%** for low-volume videos.
 
-* **🔁 A-B Loop**
+- **🔁 A-B Loop**
   Loop specific sections for learning, practice, or review — perfect for musicians and developers.
 
-* **💾 Smart Persistence**
+- **💾 Smart Persistence**
   Playback speed stays consistent across videos and playlists.
 
-* **🌑 Dark Mode UI**
+- **🌑 Dark Mode UI**
   Modern popup UI designed to blend with YouTube’s dark theme.
 
 ---
 
 ## 🧠 NEW: Advanced Focus Filter (Productivity Mode)
 
-Take control of *what* YouTube shows you — not just how fast you watch.
+Take control of _what_ YouTube shows you — not just how fast you watch.
 
 ### 🎯 Custom Block Categories
 
-* Create your own categories (e.g. **Politics**, **K-Pop**, **Clickbait**)
-* Assign:
+- Create your own categories (e.g. **Politics**, **K-Pop**, **Clickbait**)
+- Assign:
+   - Custom names
+   - Multiple keywords
+   - Unique icons
 
-  * Custom names
-  * Multiple keywords
-  * Unique icons
-* Fully user-controlled and editable
+- Fully user-controlled and editable
 
 ### ⚡ Preset Categories (One-Click)
 
 Instantly block common distractions with built-in presets:
 
-* Shorts
-* Food
-* Tech
-* AI
-* Spiritual
-* Gaming
+- Shorts
+- Food
+- Tech
+- AI
+- Spiritual
+- Gaming
 
 ### ✨ Premium Blur Mode
 
 Blocked videos are **elegantly blurred** instead of removed:
 
-* Glass-morphism overlay
-* “Filtered” label
-* Click **Show Video** to preview temporarily
+- Glass-morphism overlay
+- “Filtered” label
+- Click **Show Video** to preview temporarily
 
 ### 🔒 Strict Mode
 
 For maximum focus:
 
-* Completely removes blocked videos (`display: none`)
-* No gaps
-* No empty spaces
-* Clean, distraction-free grid
+- Completely removes blocked videos (`display: none`)
+- No gaps
+- No empty spaces
+- Clean, distraction-free grid
 
 ---
 
@@ -89,17 +89,17 @@ For maximum focus:
 
 Capture the perfect frame instantly.
 
-* Takes a **high-resolution screenshot** of the current video frame
-* Automatically **excludes player controls**
-* One-click download
-* Available directly from the **Tools** tab
+- Takes a **high-resolution screenshot** of the current video frame
+- Automatically **excludes player controls**
+- One-click download
+- Available directly from the **Tools** tab
 
 Perfect for:
 
-* Tutorials
-* Slides
-* Notes
-* Reference material
+- Tutorials
+- Slides
+- Notes
+- Reference material
 
 ---
 
@@ -138,11 +138,11 @@ Perfect for:
 
 This extension is built with a **strict privacy-first philosophy**.
 
-* ✅ No data collection
-* ✅ No tracking
-* ✅ No analytics
-* ✅ No external servers
-* ✅ 100% local execution
+- ✅ No data collection
+- ✅ No tracking
+- ✅ No analytics
+- ✅ No external servers
+- ✅ 100% local execution
 
 Your data never leaves your browser.
 
@@ -150,9 +150,9 @@ Your data never leaves your browser.
 
 ## 💻 Tech Stack
 
-* **Manifest V3** – Modern Chrome Extension architecture
-* **Vanilla JavaScript** – Lightweight & fast
-* **CSS3** – Modern styling with dark-mode support
+- **Manifest V3** – Modern Chrome Extension architecture
+- **Vanilla JavaScript** – Lightweight & fast
+- **CSS3** – Modern styling with dark-mode support
 
 ---
 
@@ -171,11 +171,13 @@ This project is **fully open source** and contributions are welcome 🎉
    ```bash
    git checkout -b feature/AmazingFeature
    ```
+
 3. Commit your changes
 
    ```bash
    git commit -m "Add AmazingFeature"
    ```
+
 4. Push to your branch
 5. Open a Pull Request
 

@@ -330,7 +330,7 @@ class SafeAdDetector {
          element.remove();
       } else if (element.tagName === "IFRAME") {
          element.style.cssText = "display: none !important;";
-         element.src = "about:blank";
+         element.remove(); // Safer than changing src to about:blank
       } else {
          // For other elements, just hide visually
          element.style.cssText = `
@@ -418,31 +418,17 @@ export async function initSafeAdBlocking(options = {}) {
    blockedCount = blockConfirmedAds();
 
    // Setup observer for dynamic content
+   let hiderThrottle = null;
    const observer = new MutationObserver((mutations) => {
-      let newBlocked = 0;
-
-      mutations.forEach((mutation) => {
-         mutation.addedNodes.forEach((node) => {
-            if (node.nodeType === 1) {
-               // Element node
-               if (detector.safelyBlockElement(node)) {
-                  newBlocked++;
-               }
-
-               // Check children
-               if (node.querySelectorAll) {
-                  node.querySelectorAll("iframe[src], script[src]").forEach((child) => {
-                     if (detector.safelyBlockElement(child)) newBlocked++;
-                  });
-               }
-            }
-         });
+      if (hiderThrottle) return;
+      hiderThrottle = requestAnimationFrame(() => {
+         let newBlocked = blockConfirmedAds(); // Run a full pass when nodes change
+         if (newBlocked > 0) {
+            blockedCount += newBlocked;
+            // console.log(`[Safe Ad Blocker] Blocked ${newBlocked} new ads (total: ${blockedCount})`);
+         }
+         hiderThrottle = null;
       });
-
-      if (newBlocked > 0) {
-         blockedCount += newBlocked;
-         console.log(`[Safe Ad Blocker] Blocked ${newBlocked} new ads (total: ${blockedCount})`);
-      }
    });
 
    observer.observe(document.documentElement, {
