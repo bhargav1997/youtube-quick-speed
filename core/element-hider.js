@@ -373,8 +373,6 @@ export async function initSafeAdBlocking(options = {}) {
    const detector = new SafeAdDetector();
    let blockedCount = 0;
 
-   console.log("[Safe Ad Blocker] Starting safe initialization...");
-
    // Block confirmed ads
    function blockConfirmedAds() {
       let blocked = 0;
@@ -425,7 +423,6 @@ export async function initSafeAdBlocking(options = {}) {
          let newBlocked = blockConfirmedAds(); // Run a full pass when nodes change
          if (newBlocked > 0) {
             blockedCount += newBlocked;
-            // console.log(`[Safe Ad Blocker] Blocked ${newBlocked} new ads (total: ${blockedCount})`);
          }
          hiderThrottle = null;
       });
@@ -436,7 +433,6 @@ export async function initSafeAdBlocking(options = {}) {
       subtree: true,
    });
 
-   console.log(`[Safe Ad Blocker] Initialized - blocked ${blockedCount} confirmed ads`);
 
    return {
       observer,
@@ -444,7 +440,6 @@ export async function initSafeAdBlocking(options = {}) {
       blockedCount,
       stop: () => {
          observer.disconnect();
-         console.log("[Safe Ad Blocker] Stopped");
       },
    };
 }
