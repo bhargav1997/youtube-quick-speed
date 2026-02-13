@@ -495,6 +495,7 @@ class TimestampNotes {
 
       chrome.storage.local.set({ videoBookmarks: this.bookmarks }, () => {
          this.renderBookmarks();
+         this.renderProgressMarkers();
       });
    }
 
