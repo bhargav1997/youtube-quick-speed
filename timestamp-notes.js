@@ -212,9 +212,12 @@ class TimestampNotes {
    }
 
    renderProgressMarkers(retryCount = 0) {
+      if (!this.isEnabled) return;
+
       // Remove existing markers
       document.querySelectorAll(".yqs-progress-marker").forEach((el) => el.remove());
-      document.getElementById("yqs-marker-tooltip")?.remove();
+      const tooltip = document.getElementById("yqs-marker-tooltip");
+      if (tooltip) tooltip.remove();
 
       const videoNotes = this.notes[this.currentVideoId] || [];
       const videoBookmarks = this.bookmarks[this.currentVideoId] || [];
@@ -248,23 +251,23 @@ class TimestampNotes {
       }
 
       // Create tooltip container if it doesn't exist
-      let tooltip = document.getElementById("yqs-marker-tooltip");
-      if (!tooltip) {
-         tooltip = document.createElement("div");
-         tooltip.id = "yqs-marker-tooltip";
-         tooltip.className = "yqs-marker-tooltip";
-         document.body.appendChild(tooltip);
+      let newTooltip = document.getElementById("yqs-marker-tooltip");
+      if (!newTooltip) {
+         newTooltip = document.createElement("div");
+         newTooltip.id = "yqs-marker-tooltip";
+         newTooltip.className = "yqs-marker-tooltip";
+         document.body.appendChild(newTooltip);
       }
 
       // Add note markers
       videoNotes.forEach((note) => {
-         const marker = this.createMarker(note.timestamp, duration, "note", note.text, progressBar, tooltip);
+         const marker = this.createMarker(note.timestamp, duration, "note", note.text, progressBar, newTooltip);
          progressBar.appendChild(marker);
       });
 
       // Add bookmark markers
       videoBookmarks.forEach((bookmark) => {
-         const marker = this.createMarker(bookmark.timestamp, duration, "bookmark", "Bookmark", progressBar, tooltip);
+         const marker = this.createMarker(bookmark.timestamp, duration, "bookmark", "Bookmark", progressBar, newTooltip);
          progressBar.appendChild(marker);
       });
    }
@@ -394,19 +397,21 @@ class TimestampNotes {
       }
 
       // Keyboard shortcuts
-      document.addEventListener("keydown", (e) => {
+      this.handleGlobalKeydown = (e) => {
          if (e.ctrlKey && e.key === "Enter") {
             this.saveNote();
          }
-      });
+      };
+      document.addEventListener("keydown", this.handleGlobalKeydown);
 
       // Listen for video metadata loaded (duration becomes available)
       const video = document.querySelector("video");
       if (video) {
-         video.addEventListener("loadedmetadata", () => {
+         this.handleMetadataLoaded = () => {
             // Re-render markers when video duration is available
             setTimeout(() => this.renderProgressMarkers(), 500);
-         });
+         };
+         video.addEventListener("loadedmetadata", this.handleMetadataLoaded);
       }
    }
 
@@ -420,6 +425,11 @@ class TimestampNotes {
       if (!this.panel || !this.overlay) return;
       this.panel.classList.remove("visible");
       this.overlay.classList.remove("visible");
+
+      // Blur any active element inside the panel to prevent focus trapping
+      if (document.activeElement && this.panel.contains(document.activeElement)) {
+         document.activeElement.blur();
+      }
    }
 
    switchTab(tabName) {
@@ -664,6 +674,25 @@ class TimestampNotes {
       if (this.overlay) {
          this.overlay.remove();
          this.overlay = null;
+      }
+
+      // Remove markers and tooltip
+      document.querySelectorAll(".yqs-progress-marker").forEach((el) => el.remove());
+      const tooltip = document.getElementById("yqs-marker-tooltip");
+      if (tooltip) tooltip.remove();
+
+      // Remove global listeners
+      if (this.handleGlobalKeydown) {
+         document.removeEventListener("keydown", this.handleGlobalKeydown);
+         this.handleGlobalKeydown = null;
+      }
+
+      if (this.handleMetadataLoaded) {
+         const video = document.querySelector("video");
+         if (video) {
+            video.removeEventListener("loadedmetadata", this.handleMetadataLoaded);
+         }
+         this.handleMetadataLoaded = null;
       }
    }
 
