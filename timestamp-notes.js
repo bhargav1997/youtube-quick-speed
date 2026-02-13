@@ -125,6 +125,12 @@ class TimestampNotes {
    }
 
    createPanel() {
+      // Create overlay
+      this.overlay = document.createElement("div");
+      this.overlay.className = "yqs-panel-overlay";
+      this.overlay.id = "yqs-panel-overlay";
+      document.body.appendChild(this.overlay);
+
       this.panel = document.createElement("div");
       this.panel.id = "yqs-notes-panel";
       this.panel.className = "yqs-panel";
@@ -315,6 +321,11 @@ class TimestampNotes {
          closeBtn.addEventListener("click", () => this.closePanel());
       }
 
+      // Close panel when clicking overlay
+      if (this.overlay) {
+         this.overlay.addEventListener("click", () => this.closePanel());
+      }
+
       // Tab switching
       document.querySelectorAll(".yqs-tab").forEach((tab) => {
          tab.addEventListener("click", () => this.switchTab(tab.dataset.tab));
@@ -400,13 +411,15 @@ class TimestampNotes {
    }
 
    togglePanel() {
-      if (!this.panel) return;
+      if (!this.panel || !this.overlay) return;
       this.panel.classList.toggle("visible");
+      this.overlay.classList.toggle("visible");
    }
 
    closePanel() {
-      if (!this.panel) return;
+      if (!this.panel || !this.overlay) return;
       this.panel.classList.remove("visible");
+      this.overlay.classList.remove("visible");
    }
 
    switchTab(tabName) {
@@ -647,6 +660,10 @@ class TimestampNotes {
       if (this.panel) {
          this.panel.remove();
          this.panel = null;
+      }
+      if (this.overlay) {
+         this.overlay.remove();
+         this.overlay = null;
       }
    }
 

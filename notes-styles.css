@@ -34,19 +34,15 @@
    color: #1a73e8;
 }
 
-/* Panel */
+/* Panel - Full Height Sidebar */
 .yqs-panel {
    position: fixed;
-   top: 50%;
-   right: -400px;
-   transform: translateY(-50%);
-   width: 380px;
-   max-height: 600px;
+   top: 0;
+   right: -420px;
+   width: 420px;
+   height: 100vh;
    background: #ffffff;
-   border-radius: 12px;
-   box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.12),
-      0 16px 64px rgba(0, 0, 0, 0.08);
+   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
    z-index: 999998;
    display: flex;
    flex-direction: column;
@@ -55,7 +51,26 @@
 }
 
 .yqs-panel.visible {
-   right: 24px;
+   right: 0;
+}
+
+/* Overlay when panel is open */
+.yqs-panel-overlay {
+   position: fixed;
+   top: 0;
+   left: 0;
+   width: 100%;
+   height: 100%;
+   background: rgba(0, 0, 0, 0.4);
+   z-index: 999997;
+   opacity: 0;
+   pointer-events: none;
+   transition: opacity 0.3s;
+}
+
+.yqs-panel-overlay.visible {
+   opacity: 1;
+   pointer-events: auto;
 }
 
 /* Panel Header */
@@ -287,7 +302,7 @@
    display: flex;
    flex-direction: column;
    gap: 8px;
-   max-height: 280px;
+   max-height: calc(100vh - 420px);
    overflow-y: auto;
    padding-right: 4px;
 }
