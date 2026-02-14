@@ -410,18 +410,6 @@
    };
 
    /**
-    * Download image
-    * @param {string} dataUrl - Image data URL
-    * @param {string} filename - Download filename
-    */
-   const downloadImage = (dataUrl, filename) => {
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = filename;
-      link.click();
-   };
-
-   /**
     * Copy image to clipboard
     * @param {string} dataUrl - Image data URL
     */
@@ -531,7 +519,7 @@
       captureFullPage,
       captureSelection,
       convertFormat,
-      downloadImage,
+
       copyToClipboard,
       printImage,
    };

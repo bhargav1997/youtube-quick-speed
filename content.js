@@ -487,10 +487,17 @@ const isGoogleApp =
 
 // Only run YouTube-specific features on YouTube
 if (currentSite.type === "youtube") {
+   let autoScrollManager = null;
    // Helper to find the video element - using EXACT selectors from Shorts HTML
    const getVideo = () => {
-      // For Shorts: Look for the exact video element structure
-      let video = document.querySelector("#shorts-player video.html5-main-video");
+      // For Shorts: Prioritize the video inside the currently active renderer
+      const activeShort = document.querySelector("ytd-reel-video-renderer[is-active]");
+      let video = activeShort ? activeShort.querySelector("video") : null;
+
+      // Fallback for older Shorts structure
+      if (!video) {
+         video = document.querySelector("#shorts-player video.html5-main-video");
+      }
 
       // For regular videos
       if (!video) {
@@ -557,6 +564,7 @@ if (currentSite.type === "youtube") {
          this.videoEndListener = null;
          this.urlObserver = null;
          this.lastURL = null;
+         this.lastVideoSrc = null;
          this.lastScrollTime = 0;
          this.scrolling = false; // Lock for race prevention
          this.bindingInterval = null;
@@ -576,9 +584,11 @@ if (currentSite.type === "youtube") {
          const video = getVideo();
          if (!video) return;
 
-         if (video !== this.currentVideo) {
-            // console.log("[Auto-Scroll] 🔄 Video element replaced, re-binding...");
+         const currentSrc = video.currentSrc || video.src;
+         if (video !== this.currentVideo || currentSrc !== this.lastVideoSrc) {
+            // console.log("[Auto-Scroll] 🔄 Video or Source changed, re-binding...");
             this.currentVideo = video;
+            this.lastVideoSrc = currentSrc;
             this.setupVideoListener(video);
          }
       }
@@ -593,18 +603,20 @@ if (currentSite.type === "youtube") {
 
          this.urlObserver.observe(document.body, {
             childList: true,
-            subtree: true,
+            subtree: false, // Reduced subtree for performance, validateVideoBinding handles the deep check
          });
       }
 
       checkForVideo() {
          if (!window.location.pathname.includes("/shorts/")) return;
 
-         // Find current Shorts video
          const video = getVideo();
+         if (!video) return;
 
-         if (video && video !== this.currentVideo) {
+         const currentSrc = video.currentSrc || video.src;
+         if (video !== this.currentVideo || currentSrc !== this.lastVideoSrc) {
             this.currentVideo = video;
+            this.lastVideoSrc = currentSrc;
             this.setupVideoListener(video);
          }
       }
@@ -613,6 +625,7 @@ if (currentSite.type === "youtube") {
          if (this.videoEndListener && this.currentVideo) {
             this.currentVideo.removeEventListener("ended", this.videoEndListener);
             this.currentVideo.removeEventListener("timeupdate", this.timeUpdateListener);
+            this.currentVideo.removeEventListener("seeked", this.videoSeekedListener);
          }
 
          this.hasTriggered = false;
@@ -621,7 +634,6 @@ if (currentSite.type === "youtube") {
 
          this.videoEndListener = () => {
             if (this.canScroll()) {
-               // console.log("[Auto-Scroll] ✅ Ended event -> Scrolling");
                this.scrollToNextShort();
             }
          };
@@ -632,9 +644,20 @@ if (currentSite.type === "youtube") {
             }
          };
 
+         this.videoSeekedListener = () => {
+            const video = this.currentVideo;
+            if (video && video.currentTime < video.duration * 0.1) {
+               // If user manually resets or video loops, allow auto-scroll again
+               // UNLESS we are in the middle of a scroll operation
+               if (!this.scrolling) {
+                  this.hasTriggered = false;
+               }
+            }
+         };
+
          video.addEventListener("ended", this.videoEndListener);
          video.addEventListener("timeupdate", this.timeUpdateListener);
-         // console.log("[Auto-Scroll] Listeners active for", video.src);
+         video.addEventListener("seeked", this.videoSeekedListener);
       }
 
       _setupVideoListener_unused(video) {
@@ -747,30 +770,33 @@ if (currentSite.type === "youtube") {
 
          const currentTime = video.currentTime;
          const duration = video.duration;
+         const playbackRate = video.playbackRate || 1.0;
 
-         // 2. Loop Detection
-         // Generic time reversal (catch-all for loops)
-         if (this.lastVideoTime > 5.0 && currentTime < 1.0) {
+         // 2. State-independent End Detection
+         // Adjust thresholds based on playback speed (at 4X speed, ticks are far apart)
+         const endThreshold = Math.max(0.3, 0.2 * playbackRate);
+         const pauseThreshold = Math.max(0.5, 0.3 * playbackRate);
+
+         const isFinished = video.ended;
+         const isEffectivelyFinished = duration - currentTime < endThreshold;
+         const isPausedAtEnd = video.paused && duration - currentTime < pauseThreshold && currentTime > 0;
+
+         if (isFinished || isEffectivelyFinished || isPausedAtEnd) {
             if (this.canScroll()) {
-               // console.log("[Auto-Scroll] 🔄 Loop (Time Jump) -> Scrolling");
+               // console.log(`[Auto-Scroll] 🏁 End detected (${playbackRate}x), scrolling...`);
                this.scrollToNextShort();
+               return;
             }
          }
-         // Percentage based loop (short videos)
-         else if (this.lastVideoTime > duration * 0.85 && currentTime < duration * 0.15) {
+
+         // 3. Loop Detection (Backwards Jump)
+         // If the player loops back to start automatically
+         const loopThreshold = Math.max(1.0, 0.5 * playbackRate);
+         if (this.lastVideoTime > 2.0 && currentTime < loopThreshold && this.lastVideoTime - currentTime > 2.0) {
             if (this.canScroll()) {
-               // console.log("[Auto-Scroll] 🔄 Loop (%) -> Scrolling");
+               // console.log(`[Auto-Scroll] 🔄 Loop detected (${playbackRate}x), scrolling...`);
                this.scrollToNextShort();
-            }
-         }
-         // 3. Near End Detection (Fallback for pause-at-end)
-         else {
-            const timeRemaining = duration - currentTime;
-            if (timeRemaining > 0 && timeRemaining < 0.25) {
-               if (this.canScroll()) {
-                  // console.log("[Auto-Scroll] ⏱️ Near End -> Scrolling");
-                  this.scrollToNextShort();
-               }
+               return;
             }
          }
 
@@ -788,10 +814,10 @@ if (currentSite.type === "youtube") {
          const now = Date.now();
 
          // Adaptive cooldown:
-         // For very short videos (e.g. 5s), 1.5s cooldown is fine.
-         // For ads (force=true), we want fast skip (0.3s).
-         // Standard: 1.2s to prevent accidental double skips.
-         let limit = force ? 300 : 1200;
+         // At high speeds (e.g. 4X), the entire video might be very short in real time.
+         // We scale the limit by the playback speed.
+         const playbackRate = this.currentVideo ? this.currentVideo.playbackRate : 1.0;
+         let limit = force ? 300 : Math.max(400, 1200 / playbackRate);
 
          if (now - this.lastScrollTime < limit) {
             return false;
@@ -841,29 +867,38 @@ if (currentSite.type === "youtube") {
             const txt = button.textContent.toLowerCase();
             if (txt.includes("install") || txt.includes("shop") || txt.includes("sign up")) signals++;
          }
-
          return signals >= 1.5; // Require at least one strong signal or multiple weak ones
       }
 
       scrollToNextShort(force = false) {
-         // 1. Keyboard Navigation (Most Reliable)
-         // console.log("[Auto-Scroll] ⌨️ Sending ArrowDown");
-         const downEvent = new KeyboardEvent("keydown", {
+         this.hasTriggered = true;
+
+         // Method 1: Click the native "Next" button
+         const nextBtn = document.querySelector("#navigation-button-down button") || document.querySelector("[aria-label='Next video']");
+         if (nextBtn) {
+            const eventOptions = { bubbles: true, cancelable: true, view: window, composed: true };
+            nextBtn.dispatchEvent(new MouseEvent("mousedown", eventOptions));
+            nextBtn.dispatchEvent(new MouseEvent("mouseup", eventOptions));
+            nextBtn.click();
+         }
+
+         // Method 2: Physical Scroll (Simulated)
+         const shortsContainer = document.querySelector("#shorts-container") || document.querySelector("ytd-shorts");
+         if (shortsContainer) {
+            shortsContainer.scrollBy({ top: window.innerHeight, behavior: "smooth" });
+         }
+
+         // Method 3: Keyboard Navigation (Arrow Down) - YouTube's most reliable listener
+         const arrowDown = new KeyboardEvent("keydown", {
             key: "ArrowDown",
             code: "ArrowDown",
             keyCode: 40,
             bubbles: true,
             cancelable: true,
+            view: window,
+            composed: true,
          });
-         document.body.dispatchEvent(downEvent);
-
-         // 2. Button Fallback (If keyboard blocked)
-         setTimeout(() => {
-            const navBtn = document.querySelector("#navigation-button-down button");
-            if (navBtn) {
-               navBtn.click();
-            }
-         }, 50);
+         document.body.dispatchEvent(arrowDown);
       }
 
       destroy() {
@@ -1119,7 +1154,7 @@ if (currentSite.type === "youtube") {
          case "TOGGLE_AUTO_SCROLL_SHORTS":
             state.isAutoScrollShortsEnabled = request.enabled;
             if (state.isAutoScrollShortsEnabled && !autoScrollManager) {
-               autoScrollManager = new AutoScrollManager();
+               autoScrollManager = new YouTubeShortsAutoScroll(state);
             } else if (!state.isAutoScrollShortsEnabled && autoScrollManager) {
                autoScrollManager.destroy();
                autoScrollManager = null;
@@ -1271,6 +1306,11 @@ if (currentSite.type === "youtube") {
             if (saved.isMirrored !== undefined) {
                state.isMirrored = saved.isMirrored;
                toggleMirror(state.isMirrored);
+            }
+
+            // Initialize auto-scroll manager after settings are loaded
+            if (state.isAutoScrollShortsEnabled && !autoScrollManager) {
+               autoScrollManager = new YouTubeShortsAutoScroll(state);
             }
 
             // Trigger filter on load
@@ -2181,12 +2221,8 @@ if (currentSite.type === "youtube") {
       subtree: false, // subtree: false on body is enough to catch app state changes
    });
 
+   // Load settings will also initialize autoScrollManager when data returns
    loadSettings();
-
-   // Initialize auto-scroll manager only if enabled
-   if (state.isAutoScrollShortsEnabled) {
-      autoScrollManager = new YouTubeShortsAutoScroll(state);
-   }
 
    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const video = getVideo();
