@@ -3,7 +3,7 @@
    "name": "YouTube Quick Speed & Loop Control",
    "version": "1.3.4",
    "description": "Control video playback, enhance audio, and access powerful browser tools — across YouTube and other websites.",
-   "permissions": ["activeTab", "storage", "declarativeNetRequest", "declarativeNetRequestFeedback", "clipboardWrite"],
+   "permissions": ["activeTab", "storage", "declarativeNetRequest", "declarativeNetRequestFeedback"],
    "host_permissions": ["<all_urls>"],
    "action": {
       "default_popup": "popup.html",

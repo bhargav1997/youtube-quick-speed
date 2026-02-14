@@ -30,7 +30,7 @@ const safeSendMessage = (message) => {
 };
 
 // ============================================================================
-// GLOBAL STATE & TOOLS (Zapper, Screenshot, etc.)
+// GLOBAL STATE & TOOLS (Zapper, etc.)
 // ============================================================================
 
 let state = {
@@ -2447,13 +2447,6 @@ if (currentSite.type === "youtube") {
             sendResponse({ success: true, isMirrored: state.isMirrored });
             break;
 
-         /*
-         case "TAKE_SNAPSHOT":
-            takeSnapshot();
-            sendResponse({ success: true });
-            break;
-         */
-
          case "GET_STATE":
             let currentSpeed = state.targetSpeed;
             if (video) {
@@ -2506,18 +2499,10 @@ if (currentSite.type === "youtube") {
 } // End of YouTube-only code
 
 // ============================================================================
-// GLOBAL SCREENSHOT HANDLERS (Works on ALL pages)
+// GLOBAL UI HANDLERS (Works on ALL pages)
 // ============================================================================
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-   /*
-   // Verify screenshot utility only for screenshot actions
-   if (request.action && request.action.includes("SCREENSHOT") && !window.ScreenshotUtil) {
-      sendResponse({ success: false, error: "Screenshot utility not loaded" });
-      return false;
-   }
-   */
-
    switch (request.action) {
       case "TOGGLE_ZAPPER":
          toggleZapper(request.enabled);
@@ -2533,59 +2518,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ success: true });
          });
          return true;
-
-      /*
-      case "CAPTURE_SCREENSHOT":
-         (async () => {
-            try {
-               let dataUrl;
-               if (request.mode === "visible") {
-                  dataUrl = await window.ScreenshotUtil.captureVisible();
-               } else if (request.mode === "full") {
-                  dataUrl = await window.ScreenshotUtil.captureFullPage();
-               }
-               sendResponse({ success: true, dataUrl });
-            } catch (error) {
-               console.error("[Screenshot] Capture error:", error);
-               sendResponse({ success: false, error: error.message });
-            }
-         })();
-         return true; // Keep channel open for async
-
-      case "CONVERT_SCREENSHOT":
-         (async () => {
-            try {
-               const dataUrl = await window.ScreenshotUtil.convertFormat(request.dataUrl, request.format);
-               sendResponse({ success: true, dataUrl });
-            } catch (error) {
-               console.error("[Screenshot] Convert error:", error);
-               sendResponse({ success: false, error: error.message });
-            }
-         })();
-         return true;
-
-      case "COPY_SCREENSHOT":
-         (async () => {
-            try {
-               const success = await window.ScreenshotUtil.copyToClipboard(request.dataUrl);
-               sendResponse({ success });
-            } catch (error) {
-               console.error("[Screenshot] Copy error:", error);
-               sendResponse({ success: false, error: error.message });
-            }
-         })();
-         return true;
-
-      case "PRINT_SCREENSHOT":
-         try {
-            window.ScreenshotUtil.printImage(request.dataUrl);
-            sendResponse({ success: true });
-         } catch (error) {
-            console.error("[Screenshot] Print error:", error);
-            sendResponse({ success: false, error: error.message });
-         }
-         break;
-      */
 
       default:
          // Not a screenshot action, ignore
