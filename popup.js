@@ -24,7 +24,6 @@ document.addEventListener("DOMContentLoaded", () => {
       loopStatus: document.getElementById("loop-status"),
       timeA: document.getElementById("time-a"),
       timeB: document.getElementById("time-b"),
-      screenshotBtn: document.getElementById("btn-screenshot"),
 
       // FOCUS FILTER
       focusToggle: document.getElementById("focus-filter-toggle"),
@@ -796,16 +795,6 @@ document.addEventListener("DOMContentLoaded", () => {
          });
       });
    });
-
-   // Video Utility Listeners
-   /*
-   if (elements.screenshotBtn) {
-      elements.screenshotBtn.addEventListener("click", () => {
-         sendMessage({ action: "TAKE_SNAPSHOT" });
-         window.close(); // Close popup to see notification/download
-      });
-   }
-   */
 
    if (elements.mirrorBtn) {
       elements.mirrorBtn.addEventListener("click", async () => {

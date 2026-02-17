@@ -374,6 +374,7 @@ const blockPopupsAndRedirects = () => {
             // Allow legitimate links, block suspicious ones
             if (
                url &&
+               !target.closest(".html5-video-player") && // Don't block clicks inside the player
                (url.includes("popup") ||
                   url.includes("redirect") ||
                   url.includes("track") ||
@@ -603,7 +604,7 @@ if (currentSite.type === "youtube") {
 
          this.urlObserver.observe(document.body, {
             childList: true,
-            subtree: false, // Reduced subtree for performance, validateVideoBinding handles the deep check
+            subtree: false,
          });
       }
 
@@ -893,7 +894,6 @@ if (currentSite.type === "youtube") {
             key: "ArrowDown",
             code: "ArrowDown",
             keyCode: 40,
-            bubbles: true,
             cancelable: true,
             view: window,
             composed: true,
@@ -1229,13 +1229,6 @@ if (currentSite.type === "youtube") {
             sendResponse({ customCategories: state.customCategories });
             break;
 
-         /*
-         case "TAKE_SNAPSHOT":
-            takeSnapshot();
-            sendResponse({ success: true });
-            break;
-         */
-
          case "TOGGLE_MIRROR":
             toggleMirror(request.enabled);
             saveSettings();
@@ -1390,34 +1383,6 @@ if (currentSite.type === "youtube") {
       }
    };
 
-   const takeSnapshot = () => {
-      const video = getVideo();
-      if (!video) return;
-
-      try {
-         const canvas = document.createElement("canvas");
-         canvas.width = video.videoWidth;
-         canvas.height = video.videoHeight;
-         const ctx = canvas.getContext("2d");
-
-         // If mirrored, flip the context too so screenshot matches view
-         if (state.isMirrored) {
-            ctx.translate(canvas.width, 0);
-            ctx.scale(-1, 1);
-         }
-
-         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-         const dataURL = canvas.toDataURL("image/png");
-         const link = document.createElement("a");
-         link.download = `snapshot_${Date.now()}.png`;
-         link.href = dataURL;
-         link.click();
-      } catch (e) {
-         console.error("Snapshot failed", e);
-      }
-   };
-
    const toggleZenMode = (enabled) => {
       state.isZenModeEnabled = enabled;
       updateZenStyle(enabled);
@@ -1542,12 +1507,14 @@ if (currentSite.type === "youtube") {
       const adModule = document.querySelector(".ytp-ad-module");
       const hasAdModuleContent = adModule && adModule.children.length > 0 && adModule.querySelector('[class*="ad-player-overlay"]');
 
-      const hasAdOverlay = document.querySelector(".ytp-ad-player-overlay") !== null;
+      const hasAdOverlay = document.querySelector(".ytp-ad-player-overlay");
+      const hasVisibleAdOverlay = hasAdOverlay && (hasAdOverlay.offsetWidth > 0 || hasAdOverlay.offsetHeight > 0);
+
       const hasSkipButton =
          document.querySelector(".ytp-ad-skip-button") !== null || document.querySelector(".ytp-skip-ad-button") !== null;
       const hasPreview = document.querySelector(".ytp-preview-ad") !== null;
 
-      return hasAdClass || hasAdOverlay || hasSkipButton || hasPreview || !!hasAdModuleContent;
+      return hasAdClass || hasVisibleAdOverlay || hasSkipButton || hasPreview || !!hasAdModuleContent;
    };
 
    // ---------------------------------------------------------
@@ -1586,13 +1553,8 @@ if (currentSite.type === "youtube") {
                   state.adSkipClicked = false; // Reset for Ad 2
                }
 
-               // Gentle Play Enforcement: If ad pauses (buffer/glitch), nudge it
-               if (currentVideo && currentVideo.paused && !currentVideo.ended) {
-                  try {
-                     currentVideo.play().catch(() => {}); // Silent catch
-                  } catch (e) {}
-               }
-
+               // Nudge only if ad is NOT paused (sometimes it stays paused when skipped)
+               // Removed aggressive force-play to allow manual pause
                if (state.isAutoSkipEnabled) skipAd();
                enforceSpeed();
             }, 100);
@@ -1748,7 +1710,7 @@ if (currentSite.type === "youtube") {
       // Strategy: Click dismiss if available, otherwise Nuke the popup from DOM and resume video.
       const enforcement = document.querySelector("ytd-enforcement-message-view-model") || document.querySelector("tp-yt-paper-dialog");
 
-      if (enforcement) {
+      if (enforcement && (enforcement.offsetWidth > 0 || enforcement.offsetHeight > 0)) {
          // Verify it's the ad-block popup by checking text content if generic dialog
          if (enforcement.tagName === "TP-YT-PAPER-DIALOG" && !enforcement.innerText.includes("Ad blockers")) {
             // Not the droid we are looking for (probably playlist/share dialog)
@@ -1796,6 +1758,7 @@ if (currentSite.type === "youtube") {
          for (const dialog of dialogs) {
             if (
                dialog.innerText &&
+               (dialog.offsetWidth > 0 || dialog.offsetHeight > 0) && // Only if visible
                (dialog.innerText.includes("Ad blockers are not allowed") || dialog.innerText.includes("Video playback is blocked"))
             ) {
                // console.log("[Auto-Skip] 🚨 Generic popup detection triggered");
@@ -2520,7 +2483,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
          return true;
 
       default:
-         // Not a screenshot action, ignore
          return false;
    }
 });

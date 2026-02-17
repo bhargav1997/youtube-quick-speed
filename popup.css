@@ -646,18 +646,11 @@ input:checked + .slider:before {
    overflow: hidden;
 }
 
-/* Primary style for the single action buttons like snapshot */
-#btn-screenshot,
 #btn-mirror {
    background: rgba(62, 166, 255, 0.1);
    border-color: rgba(62, 166, 255, 0.2);
    color: var(--primary-color);
    font-weight: 500;
-}
-#btn-screenshot:hover {
-   background: rgba(62, 166, 255, 0.2);
-   transform: translateY(-1px);
-   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .category-btn span {

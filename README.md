@@ -83,26 +83,6 @@ For maximum focus:
 
 ---
 
-## 🛠 NEW: Video Utilities
-
-### 📸 Smart Snapshot
-
-Capture the perfect frame instantly.
-
-- Takes a **high-resolution screenshot** of the current video frame
-- Automatically **excludes player controls**
-- One-click download
-- Available directly from the **Tools** tab
-
-Perfect for:
-
-- Tutorials
-- Slides
-- Notes
-- Reference material
-
----
-
 ## 📥 Installation
 
 ### Chrome Web Store (Recommended)
@@ -130,7 +110,6 @@ Perfect for:
 3. Enable **Auto-Skip Ads** or **Speed Up Ads**
 4. Use **A / B Loop** to repeat important sections
 5. Configure **Focus Filters** to block unwanted content
-6. Use **Smart Snapshot** to capture frames instantly
 
 ---
 

@@ -162,7 +162,6 @@
             enableAdSkip: true,
             enableZenMode: true,
             enableFocusFilter: true,
-            enableSnapshot: true,
             enableLoop: true,
          },
          twitch: {
@@ -171,7 +170,6 @@
             enableAdSkip: false,
             enableZenMode: false,
             enableFocusFilter: false,
-            enableSnapshot: true,
             enableLoop: false,
          },
          vimeo: {
@@ -180,7 +178,6 @@
             enableAdSkip: false,
             enableZenMode: false,
             enableFocusFilter: false,
-            enableSnapshot: true,
             enableLoop: true,
          },
          news: {
@@ -189,7 +186,6 @@
             enableAdSkip: false,
             enableZenMode: false,
             enableFocusFilter: false,
-            enableSnapshot: false,
             enableLoop: false,
          },
          social: {
@@ -198,7 +194,6 @@
             enableAdSkip: false,
             enableZenMode: false,
             enableFocusFilter: false,
-            enableSnapshot: false,
             enableLoop: false,
          },
          generic: {
@@ -207,7 +202,6 @@
             enableAdSkip: false,
             enableZenMode: false,
             enableFocusFilter: false,
-            enableSnapshot: false,
             enableLoop: false,
          },
       };
