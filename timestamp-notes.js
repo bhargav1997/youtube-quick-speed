@@ -249,6 +249,11 @@ class TimestampNotes {
 
       <!-- FOOTER -->
       <div class="yqs-panel-footer">
+         <!-- AI Assistant Toggle -->
+         <button class="yqs-ai-btn" id="yqs-ai-btn" aria-label="Generate AI Prompt">
+            <span class="yqs-ai-sparkle">✨</span> AI Magic
+         </button>
+
          <button class="yqs-footer-btn" id="yqs-copy-all-btn" aria-label="Copy all notes">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
@@ -466,6 +471,10 @@ class TimestampNotes {
             this._showToast(`Copied ${time}`, "⏱");
          });
       }
+
+      // AI button
+      const aiBtn = document.getElementById("yqs-ai-btn");
+      if (aiBtn) aiBtn.addEventListener("click", () => this._showAIModal());
 
       // Copy all
       const copyAllBtn = document.getElementById("yqs-copy-all-btn");
@@ -1108,9 +1117,256 @@ class TimestampNotes {
          .map(n => `[${this.formatTime(n.timestamp)}] ${n.text}${n.tags && n.tags.length ? " — " + n.tags.map(t => "#" + t).join(" ") : ""}`)
          .join("\n");
 
-      navigator.clipboard.writeText(text)
+         navigator.clipboard.writeText(text)
          .then(() => this._showToast("Copied all notes!", "⎘"))
          .catch(() => this._showToast("Copy failed", "✗"));
+   }
+
+   // ═══════════════════════════════════════════════════════════════
+   // AI Prompt Generator
+   // ═══════════════════════════════════════════════════════════════
+
+   _showAIModal() {
+      if (document.getElementById("yqs-ai-modal-backdrop")) return;
+
+      const backdrop = document.createElement("div");
+      backdrop.id = "yqs-ai-modal-backdrop";
+      backdrop.className = "yqs-ai-modal-backdrop";
+
+      backdrop.innerHTML = this._aiModalHTML();
+      document.body.appendChild(backdrop);
+
+      this._aiState = {
+         mode: 'full', // 'full' or 'range'
+         start: '0:00',
+         end: this.formatTime(this.getCurrentTime())
+      };
+
+      this._setupAIEventListeners(backdrop);
+      this._updateAIPreview();
+   }
+
+   _hideAIModal() {
+      const backdrop = document.getElementById("yqs-ai-modal-backdrop");
+      if (backdrop) {
+         backdrop.style.opacity = "0";
+         const modal = backdrop.querySelector(".yqs-ai-modal");
+         if (modal) modal.style.transform = "translateY(30px)";
+         setTimeout(() => backdrop.remove(), 200);
+      }
+   }
+
+   _aiModalHTML() {
+      return `
+      <div class="yqs-ai-modal">
+         <div class="yqs-ai-modal-header">
+            <div class="yqs-ai-modal-title">
+               <h3><span class="ai-gradient-text">✨ AI Intelligence</span></h3>
+               <span class="yqs-ai-modal-subtitle">Generate a professional prompt for Gemini / ChatGPT based on your captured moments.</span>
+            </div>
+            <button class="yqs-ai-close" id="yqs-ai-close">
+               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+               </svg>
+            </button>
+         </div>
+
+         <div class="yqs-ai-modes">
+            <button class="yqs-ai-mode-btn active" data-mode="full">
+               <span class="yqs-ai-mode-icon">🎬</span>
+               <span class="yqs-ai-mode-label">Full Video</span>
+               <span class="yqs-ai-mode-desc">Analyze entire video + all notes</span>
+            </button>
+            <button class="yqs-ai-mode-btn" data-mode="range">
+               <span class="yqs-ai-mode-icon">🎯</span>
+               <span class="yqs-ai-mode-label">Specific Range</span>
+               <span class="yqs-ai-mode-desc">Deep-dive into a specific segment</span>
+            </button>
+         </div>
+
+         <div class="yqs-ai-range" id="yqs-ai-range-inputs">
+            <label>From</label>
+            <input type="text" id="yqs-ai-start" placeholder="0:00" value="0:00">
+            <span class="yqs-ai-range-arrow">→</span>
+            <label>To</label>
+            <input type="text" id="yqs-ai-end" placeholder="5:30">
+         </div>
+
+         <div class="yqs-ai-preview-wrap">
+            <div class="yqs-ai-preview-label">
+               <span>Generated Prompt Preview</span>
+               <span class="yqs-ai-char-count" id="yqs-ai-char-count">0 chars</span>
+            </div>
+            <div class="yqs-ai-preview" id="yqs-ai-preview" contenteditable="false"></div>
+         </div>
+
+         <div class="yqs-ai-actions">
+            <button class="yqs-ai-action-copy" id="yqs-ai-copy">
+               <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                  <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+               </svg>
+               Copy Prompt
+            </button>
+            <a href="https://gemini.google.com/" target="_blank" class="yqs-ai-open-gemini">
+               <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                  <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+               </svg>
+               Open Gemini
+            </a>
+         </div>
+      </div>`;
+   }
+
+   _setupAIEventListeners(backdrop) {
+      const closeBtn = backdrop.querySelector("#yqs-ai-close");
+      const modeBtns = backdrop.querySelectorAll(".yqs-ai-mode-btn");
+      const startInput = backdrop.querySelector("#yqs-ai-start");
+      const endInput = backdrop.querySelector("#yqs-ai-end");
+      const copyBtn = backdrop.querySelector("#yqs-ai-copy");
+
+      closeBtn.addEventListener("click", () => this._hideAIModal());
+      backdrop.addEventListener("click", (e) => { if (e.target === backdrop) this._hideAIModal(); });
+
+      modeBtns.forEach(btn => {
+         btn.addEventListener("click", () => {
+            modeBtns.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            this._aiState.mode = btn.dataset.mode;
+            
+            const rangeUI = document.getElementById("yqs-ai-range-inputs");
+            if (this._aiState.mode === 'range') rangeUI.classList.add("visible");
+            else rangeUI.classList.remove("visible");
+
+            this._updateAIPreview();
+         });
+      });
+
+      const onInputChange = () => {
+         this._aiState.start = startInput.value;
+         this._aiState.end = endInput.value;
+         this._updateAIPreview();
+      };
+
+      startInput.addEventListener("input", onInputChange);
+      endInput.addEventListener("input", onInputChange);
+      
+      // Auto-set end time if empty
+      if (!endInput.value) {
+         endInput.value = this.formatTime(this.getCurrentTime());
+         this._aiState.end = endInput.value;
+      }
+
+      copyBtn.addEventListener("click", () => {
+         const preview = document.getElementById("yqs-ai-preview");
+         const text = preview.innerText;
+         navigator.clipboard.writeText(text).then(() => {
+            copyBtn.classList.add("copied");
+            copyBtn.innerHTML = `
+               <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+               </svg>
+               Prompt Copied!`;
+            this._showToast("Ready to paste!", "✨");
+            setTimeout(() => {
+               copyBtn.classList.remove("copied");
+               copyBtn.innerHTML = `
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                     <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                  </svg>
+                  Copy Prompt`;
+            }, 3000);
+         });
+      });
+   }
+
+   _getVideoDescription() {
+      // Try multiple selectors as YouTube changes them often
+      const selectors = [
+         '#description-inline-expander yt-formatted-string',
+         '#description .ytd-video-secondary-info-renderer',
+         '#description-text',
+         'yt-formatted-string.content.style-scope.ytd-video-secondary-info-renderer'
+      ];
+      for (const s of selectors) {
+         const el = document.querySelector(s);
+         if (el && el.innerText.trim()) return el.innerText.trim().slice(0, 1000); // Caps it to avoid prompt bloat
+      }
+      return "";
+   }
+
+   _parseTimeToSeconds(timeStr) {
+      if (!timeStr) return 0;
+      const parts = timeStr.split(':').map(Number);
+      if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+      if (parts.length === 2) return parts[0] * 60 + parts[1];
+      return parts[0] || 0;
+   }
+
+   _updateAIPreview() {
+      const preview = document.getElementById("yqs-ai-preview");
+      const count = document.getElementById("yqs-ai-char-count");
+      if (!preview) return;
+
+      const videoNotes = this.notes[this.currentVideoId] || [];
+      const description = this._getVideoDescription();
+      const url = `https://youtube.com/watch?v=${this.currentVideoId}`;
+      const title = this.currentVideoTitle;
+
+      let prompt = "";
+
+      if (this._aiState.mode === 'full') {
+         prompt = `I am watching this YouTube video and I need your help to summarize and extract intelligence from it.
+         
+---
+VIDEO CONTEXT:
+Title: ${title}
+URL: ${url}
+${description ? `Description: ${description}\n` : ""}
+---
+MY CAPTURED MOMENTS & NOTES:
+${videoNotes.length > 0 
+   ? videoNotes.map(n => `[${this.formatTime(n.timestamp)}] ${n.text}${n.tags.length ? ` (Tags: ${n.tags.join(', ')})` : ""}`).reverse().join('\n')
+   : "I haven't taken specific notes yet, please analyze the video content directly."}
+---
+
+MISSION:
+1. Provide a concise high-level summary of the core message.
+2. Extract the 5 most actionable key takeaways or insights.
+3. If applicable, identify any controversial points or significant data mentioned.
+4. Paraphrase the overall value of the video for a professional portfolio.
+
+Please format your response in a clear, professional markdown structure.`;
+      } else {
+         const startSec = this._parseTimeToSeconds(this._aiState.start);
+         const endSec = this._parseTimeToSeconds(this._aiState.end);
+         
+         const filteredNotes = videoNotes.filter(n => n.timestamp >= startSec && n.timestamp <= endSec);
+
+         prompt = `I am studying a specific segment of this YouTube video and I need a deep-dive analysis of exactly what occurs between ${this._aiState.start} and ${this._aiState.end}.
+
+---
+VIDEO CONTEXT:
+Title: ${title}
+Segment: ${this._aiState.start} - ${this._aiState.end}
+URL: ${url}&t=${startSec}s
+---
+MY NOTES FROM THIS SEGMENT:
+${filteredNotes.length > 0 
+   ? filteredNotes.map(n => `[${this.formatTime(n.timestamp)}] ${n.text}${n.tags.length ? ` (Tags: ${n.tags.join(', ')})` : ""}`).reverse().join('\n')
+   : "No internal notes for this specific range."}
+---
+
+MISSION:
+1. Explain the primary topic or argument being presented in this specific timeframe.
+2. Synthesize the key points discussed and their relationship to the broader video context.
+3. Analyze the logic or demonstration shown in these minutes.
+4. Summarize the conclusion reached by the speaker at the end of this segment.
+
+Please use professional, concise language and format with markdown.`;
+      }
+
+      preview.innerText = prompt;
+      if (count) count.textContent = `${prompt.length} characters`;
    }
 
    // ═══════════════════════════════════════════════════════════════
