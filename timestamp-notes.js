@@ -135,12 +135,33 @@ class TimestampNotes {
    createFloatingButton() {
       this.floatingBtn = document.createElement("button");
       this.floatingBtn.id = "yqs-floating-note-btn";
-      this.floatingBtn.title = "Quick Notes";
+      this.floatingBtn.title = "Quick Notes (Cmd+Enter)";
       this.floatingBtn.innerHTML = `
-         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
-         </svg>`;
+         <div class="yqs-float-glass"></div>
+         <div class="yqs-float-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+               <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+            </svg>
+         </div>
+         <div class="yqs-float-badge" id="yqs-float-badge">0</div>
+      `;
       document.body.appendChild(this.floatingBtn);
+      this._updateFloatBadge();
+   }
+
+   _updateFloatBadge() {
+      const badge = document.getElementById("yqs-float-badge");
+      if (!badge) return;
+      
+      const count = (this.notes[this.currentVideoId] || []).length;
+      badge.textContent = count;
+      badge.style.display = count > 0 ? "flex" : "none";
+      
+      if (count > 0) {
+         this.floatingBtn.classList.add("has-notes");
+      } else {
+         this.floatingBtn.classList.remove("has-notes");
+      }
    }
 
    createPanel() {
@@ -637,6 +658,8 @@ class TimestampNotes {
       const exportBtn = document.getElementById("yqs-export-btn");
 
       if (!list) return;
+
+      this._updateFloatBadge();
 
       const videoNotes = this.notes[this.currentVideoId] || [];
 

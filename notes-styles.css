@@ -68,33 +68,117 @@ html[dark] .yqs-ai-modal-backdrop {
 #yqs-floating-note-btn {
   position: fixed;
   bottom: 100px;
-  right: 24px;
-  width: 48px;
-  height: 48px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 50%;
-  box-shadow: var(--shadow-md);
+  right: 28px;
+  width: 54px;
+  height: 54px;
+  padding: 0;
+  border: none;
+  background: none;
   cursor: pointer;
+  z-index: 999999;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 999999;
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
-              box-shadow 0.2s ease,
-              background 0.15s ease;
-  color: var(--accent);
-  font-family: var(--font);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-#yqs-floating-note-btn:hover {
+/* Glass background layer */
+.yqs-float-glass {
+  position: absolute;
+  inset: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px; /* Squircle-ish 14px */
+  box-shadow: 
+    0 4px 12px rgba(0,0,0,0.1),
+    0 2px 4px rgba(0,0,0,0.05),
+    inset 0 0 0 1px rgba(255,255,255,0.05);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: -1;
+}
+
+#yqs-floating-note-btn:hover .yqs-float-glass {
+  transform: scale(1.08);
+  border-color: var(--accent);
   background: var(--surface-hover);
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px) scale(1.05);
+  box-shadow: 
+    0 8px 24px rgba(124, 58, 237, 0.25),
+    0 0 0 1px rgba(124, 58, 237, 0.2);
+}
+
+/* Icon container */
+.yqs-float-icon {
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s;
+}
+
+/* Accent glow when notes exist */
+#yqs-floating-note-btn.has-notes .yqs-float-icon {
+  color: var(--accent);
+}
+
+#yqs-floating-note-btn:hover .yqs-float-icon {
+  transform: rotate(5deg) scale(1.1);
+  color: var(--accent);
 }
 
 #yqs-floating-note-btn:active {
-  transform: translateY(0) scale(0.96);
+  transform: scale(0.92);
+}
+
+/* Dynamic Notification Badge */
+.yqs-float-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font);
+  border-radius: 9px;
+  display: none; /* JS toggles display:flex */
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg-panel);
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.4);
+  animation: badgePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes badgePop {
+  0%   { transform: scale(0); opacity: 0; }
+  70%  { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Pulsing "Active" state when video has notes */
+#yqs-floating-note-btn.has-notes::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--accent);
+  opacity: 0.8;
+  animation: accentPulse 2s infinite;
+}
+
+@keyframes accentPulse {
+  0%   { transform: translateX(-50%) scale(1); opacity: 0.8; }
+  50%  { transform: translateX(-50%) scale(1.8); opacity: 0; }
+  100% { transform: translateX(-50%) scale(1); opacity: 0; }
 }
 
 /* ── Panel Shell ───────────────────────────────────────────── */
