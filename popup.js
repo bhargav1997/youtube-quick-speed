@@ -260,6 +260,14 @@ document.addEventListener("DOMContentLoaded", () => {
          if (elements.filterGrayscale) elements.filterGrayscale.checked = state.filters.grayscale;
          if (elements.filterInvert) elements.filterInvert.checked = state.filters.invert;
 
+         // Sync rotate badge & button state
+         const rotateDeg = state.filters.rotate || 0;
+         const rotateBadge = document.getElementById("rotate-deg-badge");
+         if (rotateBadge) rotateBadge.textContent = `${rotateDeg}°`;
+         if (elements.btnRotate) {
+            elements.btnRotate.classList.toggle("is-rotated", rotateDeg !== 0);
+         }
+
          // Update Cinema Mode Header Active State
          if (elements.headerCinemaMode) {
             const isActive = checkCinemaModeActive(state.filters);
@@ -405,8 +413,6 @@ document.addEventListener("DOMContentLoaded", () => {
    // We rely on `updateUI` to keep `currentFilters` in scope?
    // No, simpler:
    elements.btnRotate.onclick = async () => {
-      // Get current rotation from content script first to be safe? Or trust local storage?
-      // Let's query state first.
       const current = await sendMessage({ action: "GET_STATE" });
       let deg = 0;
       if (current && current.filters) {
@@ -414,6 +420,15 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       deg = (deg + 90) % 360;
       await sendMessage({ action: "SET_FILTERS", filters: { rotate: deg } });
+
+      // Update degree badge
+      const badge = document.getElementById("rotate-deg-badge");
+      if (badge) badge.textContent = `${deg}°`;
+
+      // Toggle is-rotated class (active when not back to 0°)
+      if (elements.btnRotate) {
+         elements.btnRotate.classList.toggle("is-rotated", deg !== 0);
+      }
    };
 
    // --- Collapsible Logic ---
