@@ -919,3 +919,158 @@ footer {
     .stats-grid { grid-template-columns: 1fr 1fr; gap: 40px; }
     .reviews-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================
+   HeaderCraft Dev — Product Section Styles
+   ============================================ */
+
+/* HeaderCraft Gradient */
+:root {
+    --gradient-hc: linear-gradient(135deg, #ff9f43, #f0932b);
+}
+
+/* HeaderCraft Button */
+.btn-headercraft {
+    background: var(--gradient-hc);
+    color: white;
+    box-shadow: 0 4px 15px rgba(255, 159, 67, 0.3);
+}
+
+/* Product Section Title Gradient */
+#headercraft h2 {
+    background: var(--gradient-hc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* HeaderCraft feature list icon color */
+#headercraft .feature-list li i {
+    color: #f0932b;
+}
+
+/* Stats: 5-column layout */
+.stats-grid-5 {
+    grid-template-columns: repeat(5, 1fr);
+}
+
+.stat-item.hc-stat h3 {
+    background: var(--gradient-hc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Ecosystem: Comparison Trio */
+.comparison-trio {
+    max-width: 1000px;
+}
+
+.comp-col-hc i {
+    color: #ff9f43;
+}
+
+/* HeaderCraft Visual Card — CSS Art Header Editor */
+.ui-header-editor {
+    width: 220px;
+    background: linear-gradient(180deg, #1e272e, #0f1115);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.ui-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: all 0.3s ease;
+}
+
+.ui-header-row:last-of-type {
+    margin-bottom: 0;
+}
+
+.ui-header-row.active-row {
+    background: rgba(255, 159, 67, 0.12);
+    border-color: rgba(255, 159, 67, 0.3);
+}
+
+.ui-header-key {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #ff9f43;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.5px;
+}
+
+.ui-header-val {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    font-family: 'Courier New', monospace;
+    opacity: 0.8;
+}
+
+.ui-mock-badge {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background: var(--gradient-hc);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 50px;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 10px rgba(255, 159, 67, 0.4);
+    animation: pulse-glow 3s infinite;
+}
+
+/* Hover effects for HeaderCraft visual */
+.visual-card:hover .ui-header-row {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.visual-card:hover .ui-header-row.active-row {
+    background: rgba(255, 159, 67, 0.18);
+    transform: translateX(3px);
+}
+
+.visual-card:hover .ui-mock-badge {
+    transform: scale(1.1);
+}
+
+/* Visual glow for HeaderCraft section */
+.visual-hc {
+    background: linear-gradient(135deg, rgba(255, 159, 67, 0.05), var(--glass-bg));
+}
+
+/* Responsive: 5-col stats → 3+2 on tablet, 2+1 on mobile */
+@media (max-width: 900px) {
+    .stats-grid-5 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    .comparison-trio {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 768px) {
+    .stats-grid-5 {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .stats-grid-5 {
+        grid-template-columns: 1fr 1fr;
+    }
+    .hero-btns {
+        flex-direction: column;
+    }
+}
